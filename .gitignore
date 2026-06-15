@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.pycache_tmp/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# PyInstaller/build outputs
+build/
+dist/
+*.spec.bak
+TabX.app/
+
+# macOS
+.DS_Store
+
+# Local logs
+*.log
