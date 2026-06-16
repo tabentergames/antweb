@@ -19,3 +19,6 @@ TabX.app/
 
 # Local logs
 *.log
+
+# Local user state
+data/ui_state.json

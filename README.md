@@ -34,6 +34,24 @@ python3 scripts/build_macos_app.py
 - `+` butonu ile yeni sekme eklenebilir
 - `←/→/↻` butonları işlevseldir
 
+## 🎨 F2 Başlangıcı: Görsel Kabuk
+
+Bu sürümde F2 için ilk görsel kabuk eklendi:
+
+- Premium açık tema, yumuşak panel ayrımları ve modern omnibox
+- Sekmeler üst sırada, adres/araç çubuğu sekmelerin altında konumlanır
+- Varsayılan kapalı sol navigasyon paneli; sol rail'deki `☰` butonu ile açılır
+- Varsayılan kapalı sağ sekme grupları paneli; sağ rail'deki `▦` butonu ile açılır
+- Oturum içinde özel sol kısayol ve sağ sekme grubu oluşturma
+- Sekme gruplarında `+` aktif sekmeyi gruba ekler, `x` grup veya kayıt siler
+- Özel kısayollar ve sekme grupları `data/ui_state.json` içinde yerel olarak saklanır
+- Native koyu macOS input modalları yerine açık temalı TabX dialogları kullanılır
+- Harf etiketleri yerine ikon/sembol tabanlı kontroller tercih edilir
+- Yeni sekme dashboard'u, hızlı erişim kartları ve hafif Web Haritası önizlemesi
+- RAM tüketimini sınırlamak için fan sekme modu ve ek WebEngine görünümleri şimdilik eklenmedi
+
+> Not: Fan sekme modu F2 kapsamındadır ancak bu dilimde bilinçli olarak bekletildi.
+
 ---
 
 ## 📖 Proje Hakkında
@@ -117,7 +135,7 @@ Mevcut tarayıcılardan en iyi özellikleri alıp bunlara yenilerini ekleyerek o
 | Aşama                              | Kapsam                                                              | Durum             |
 | ---------------------------------- | ------------------------------------------------------------------ | ----------------- |
 | **v0.1** — Çekirdek (MVP)          | QtWebEngine entegrasyonu, sekme + navigasyon, ayar/tema altyapısı   | 🔄 Geliştiriliyor |
-| **v0.2** — Görsel & Sekmeler       | Fan sekme modu, tema motoru, esnek sekme konumu (ilk "vay be")      | 📋 Planlandı      |
+| **v0.2** — Görsel & Sekmeler       | Tema kabuğu başladı; fan sekme modu ve esnek sekme konumu sırada    | 🔄 Geliştiriliyor |
 | **v0.3** — Gizlilik Katmanı        | TabX eklenti sistemi, ad/tracker blocking, HTTPS upgrade, izinler   | 📋 Planlandı      |
 | **v0.4** — Profil & Workspace      | Çoklu profil, workspace, oturum kaydetme, sekme grupları            | 📋 Planlandı      |
 | **v0.5** — Productivity            | Todo, Kanban board, zaman takibi, takvim (floating widget'lar)      | 📋 Planlandı      |
