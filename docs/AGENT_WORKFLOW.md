@@ -91,12 +91,13 @@ Sıralamayı bozma. Bir faz "Tamamlanma Kriteri"ni karşılamadan sonrakine geç
 Her agent bir göreve başlarken:
 
 1. **Bu belgeyi ve `README.md`yi oku.** Vizyon ve mimari sınırların dışına çıkma.
-2. **Kapsamı küçük tut.** Tek bir modül/özellik üzerinde çalış. Birden fazla fazı aynı anda açma.
-3. **Mevcut yapıyı bozma.** Çalışan bir şeyi kırma; değişikliğin geriye dönük uyumlu olsun.
-4. **Çalışır halde bırak.** İşin bittiğinde `python main.py` çalışmalı. Yarım/derlenmeyen kod bırakma.
-5. **Test et.** Mümkünse `tests/` altına test ekle, mevcut testleri çalıştır.
-6. **Belgeyi güncelle.** Yeni modül/komut eklediysen README ve gerekirse bu dosyayı güncelle.
-7. **Sade kod yaz.** Gereksiz soyutlama yok. Yorum yalnızca gerçekten gerekliyse.
+2. **Memory bank'i oku.** `memory-bank/README.md` dosyasındaki sırayı takip et; mevcut durum ve backlog'u oradan al.
+3. **Kapsamı küçük tut.** Tek bir modül/özellik üzerinde çalış. Birden fazla fazı aynı anda açma.
+4. **Mevcut yapıyı bozma.** Çalışan bir şeyi kırma; değişikliğin geriye dönük uyumlu olsun.
+5. **Çalışır halde bırak.** İşin bittiğinde `python main.py` çalışmalı. Yarım/derlenmeyen kod bırakma.
+6. **Test et.** Mümkünse `tests/` altına test ekle, mevcut testleri çalıştır.
+7. **Belgeyi güncelle.** Yeni modül/komut eklediysen README, memory bank ve gerekirse bu dosyayı güncelle.
+8. **Sade kod yaz.** Gereksiz soyutlama yok. Yorum yalnızca gerçekten gerekliyse.
 
 ### Görev şablonu (her PR/commit için)
 

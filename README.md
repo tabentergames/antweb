@@ -39,7 +39,10 @@ python3 scripts/build_macos_app.py
 Bu sürümde F2 için ilk görsel kabuk eklendi:
 
 - Premium açık tema, yumuşak panel ayrımları ve modern omnibox
+- `ui/theme.py` ile açık/koyu tema tokenları ve kalıcı tema tercihi
 - Sekmeler üst sırada, adres/araç çubuğu sekmelerin altında konumlanır
+- Toolbar'daki `⇅` kontrolüyle sekmeler üst/alt konuma alınabilir
+- Toolbar'daki `◐` kontrolüyle açık/koyu tema değiştirilebilir
 - Varsayılan kapalı sol navigasyon paneli; sol rail'deki `☰` butonu ile açılır
 - Varsayılan kapalı sağ sekme grupları paneli; sağ rail'deki `▦` butonu ile açılır
 - Oturum içinde özel sol kısayol ve sağ sekme grubu oluşturma
@@ -48,9 +51,9 @@ Bu sürümde F2 için ilk görsel kabuk eklendi:
 - Native koyu macOS input modalları yerine açık temalı TabX dialogları kullanılır
 - Harf etiketleri yerine ikon/sembol tabanlı kontroller tercih edilir
 - Yeni sekme dashboard'u, hızlı erişim kartları ve hafif Web Haritası önizlemesi
-- RAM tüketimini sınırlamak için fan sekme modu ve ek WebEngine görünümleri şimdilik eklenmedi
+- RAM tüketimini sınırlamak için fan sekme modu ve ek WebEngine görünümleri şimdilik eklenmedi; F2 kriteri esnek sekme konumu ile kapatıldı
 
-> Not: Fan sekme modu F2 kapsamındadır ancak bu dilimde bilinçli olarak bekletildi.
+> Not: Fan sekme modu sonraki görsel iterasyona bırakıldı; F2 bu sürümde tema motoru + esnek sekme konumu ile tamamlandı.
 
 ---
 
@@ -213,6 +216,9 @@ tabx-browser/
 > 🤖 **Geliştiriciler ve AI agent'lar için:** Katkıda bulunmadan önce
 > [`docs/AGENT_WORKFLOW.md`](docs/AGENT_WORKFLOW.md) dosyasını okuyun. Mimari ilkeler,
 > geliştirme sırası (faz faz) ve çalışma kuralları orada tanımlıdır.
+> Hızlı proje hafızası ve görev devri için ayrıca [`memory-bank/README.md`](memory-bank/README.md),
+> eksik tarayıcı yüzeyleri için [`docs/BROWSER_SURFACE_INVENTORY.md`](docs/BROWSER_SURFACE_INVENTORY.md)
+> ve görsel yön için [`docs/VISUAL_DIRECTION_REPORT.md`](docs/VISUAL_DIRECTION_REPORT.md) dosyalarını kullanın.
 
 ---
 

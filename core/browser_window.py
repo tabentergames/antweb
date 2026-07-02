@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-TabX Browser - F2 visual shell.
+TabX Browser - F2 visual shell + F3 privacy layer.
 
 The browser keeps the F1 navigation contract intact while adding a lightweight
-premium UI shell. Fan tabs are intentionally left out of this slice.
+premium UI shell and the F3 privacy features (ad/tracker blocking, HTTPS upgrade,
+extension runtime).
 """
 
 import os
@@ -13,9 +14,14 @@ from pathlib import Path
 
 os.environ["QT_WEBENGINE_CHROMIUM_FLAGS"] = "--enable-features=NetworkService"
 
-from PyQt6.QtCore import Qt, QUrl, pyqtSignal
-from PyQt6.QtWebEngineCore import QWebEngineSettings
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PyQt6.QtWebEngineWidgets import QWebEngineView
+
+# F3 privacy layer
+from features.privacy.service import PrivacyService
+from ui.tabs.tab_strip import TabWidget
+from ui.theme import Theme
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -31,48 +37,14 @@ from PyQt6.QtWidgets import (
 )
 
 
-class Theme:
-    """Centralized F2 visual tokens."""
-
-    bg = "#f6f7fb"
-    panel = "#fbfbfe"
-    panel_alt = "#f1f3f8"
-    card = "#ffffff"
-    border = "#e2e6ef"
-    border_soft = "#edf0f6"
-    text = "#172033"
-    muted = "#6b7280"
-    subtle = "#9aa4b2"
-    purple = "#7c5cff"
-    blue = "#2f80ed"
-    purple_soft = "#f0edff"
-    blue_soft = "#eaf3ff"
-    shadow = "rgba(31, 41, 55, 0.08)"
-
-    qss = f"""
-        QWidget {{
-            font-family: Arial;
-            color: {text};
-        }}
-        QPushButton {{
-            font-weight: 600;
-        }}
-        QToolTip {{
-            background-color: #111827;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 6px 8px;
-        }}
-    """
-
-
 class UiStateStore:
     """Small local JSON store for F2 UI preferences."""
 
     state_path = Path(__file__).resolve().parent.parent / "data" / "ui_state.json"
 
     defaults = {
+        "theme_mode": "light",
+        "tab_position": "top",
         "custom_nav_items": [],
         "tab_groups": [
             {
@@ -100,6 +72,10 @@ class UiStateStore:
 
         state = cls.defaults.copy()
         if isinstance(loaded, dict):
+            if loaded.get("theme_mode") in {"light", "dark"}:
+                state["theme_mode"] = loaded["theme_mode"]
+            if loaded.get("tab_position") in {"top", "bottom"}:
+                state["tab_position"] = loaded["tab_position"]
             if isinstance(loaded.get("custom_nav_items"), list):
                 state["custom_nav_items"] = loaded["custom_nav_items"]
             if isinstance(loaded.get("tab_groups"), list):
@@ -107,9 +83,11 @@ class UiStateStore:
         return state
 
     @classmethod
-    def save(cls, custom_nav_items, tab_groups):
+    def save(cls, custom_nav_items, tab_groups, theme_mode="light", tab_position="top"):
         cls.state_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
+            "theme_mode": "dark" if theme_mode == "dark" else "light",
+            "tab_position": "bottom" if tab_position == "bottom" else "top",
             "custom_nav_items": [
                 [str(icon), str(text)] for icon, text in custom_nav_items
             ],
@@ -157,7 +135,7 @@ class TextInputDialog(QDialog):
             QLineEdit {{
                 border: 1px solid {Theme.border};
                 border-radius: 14px;
-                background-color: #ffffff;
+                background-color: {Theme.input};
                 padding: 0 12px;
                 font-size: 13px;
                 color: {Theme.text};
@@ -282,213 +260,6 @@ class BrowserTab(QWebEngineView):
         )
 
 
-class TabButton(QFrame):
-    """Compact modern tab button."""
-
-    clicked = pyqtSignal()
-    closed = pyqtSignal()
-
-    def __init__(self, title="Yeni Sekme", active=False, closable=True, parent=None):
-        super().__init__(parent)
-        self._title = title
-        self._active = active
-        self._closable = closable
-
-        self.setFixedHeight(34)
-        self.setMinimumWidth(144)
-        self.setMaximumWidth(240)
-        self.setup_ui()
-        self.apply_style()
-
-    def setup_ui(self):
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 0, 8, 0)
-        layout.setSpacing(8)
-
-        self.icon_label = QLabel()
-        self.icon_label.setFixedSize(9, 9)
-        layout.addWidget(self.icon_label)
-
-        self.title_label = QLabel(self._title)
-        self.title_label.setAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
-        self.title_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-        self.title_label.setStyleSheet(
-            f"color: {Theme.text}; font-size: 12px; font-weight: 650;"
-        )
-        layout.addWidget(self.title_label, 1)
-
-        if self._closable:
-            self.close_btn = QPushButton("×")
-            self.close_btn.setFixedSize(18, 18)
-            self.close_btn.setStyleSheet(
-                f"""
-                QPushButton {{
-                    border: none;
-                    border-radius: 9px;
-                    background: transparent;
-                    color: {Theme.subtle};
-                    font-size: 12px;
-                    font-weight: 700;
-                }}
-                QPushButton:hover {{
-                    background-color: #e7eaf2;
-                    color: {Theme.text};
-                }}
-                """
-            )
-            self.close_btn.clicked.connect(lambda checked=False: self.closed.emit())
-            layout.addWidget(self.close_btn)
-
-        self.mousePressEvent = self._handle_mouse_press
-
-    def _handle_mouse_press(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit()
-        super().mousePressEvent(event)
-
-    def apply_style(self):
-        bg_color = Theme.card if self._active else "#eef1f7"
-        border_color = "#dfe4ee" if self._active else "#e6eaf2"
-        dot_color = Theme.purple if self._active else "#aab3c2"
-        self.icon_label.setStyleSheet(
-            f"QLabel {{ background-color: {dot_color}; border-radius: 4px; }}"
-        )
-        self.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {bg_color};
-                border: 1px solid {border_color};
-                border-radius: 11px;
-            }}
-            QFrame:hover {{
-                background-color: #ffffff;
-                border-color: #d9def0;
-            }}
-            """
-        )
-
-    def setTitle(self, text):
-        self._title = text
-        self.title_label.setText(text)
-        self.setMaximumWidth(270 if len(text) > 22 else 240)
-
-    def setActive(self, active):
-        self._active = active
-        self.apply_style()
-
-
-class TabWidget(QWidget):
-    """Tab strip without fan-mode behavior."""
-
-    tabClosed = pyqtSignal(int)
-    tabActivated = pyqtSignal(int)
-    newTabRequested = pyqtSignal()
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._tabs = []
-        self._active_index = 0
-        self._views = []
-
-        self.layout = QHBoxLayout(self)
-        self.setObjectName("tabStrip")
-        self.layout.setContentsMargins(14, 8, 14, 8)
-        self.layout.setSpacing(6)
-        self.setFixedHeight(50)
-        self.setStyleSheet(
-            f"""
-            QWidget#tabStrip {{
-                background-color: {Theme.panel};
-                border-bottom: 1px solid {Theme.border_soft};
-            }}
-            """
-        )
-
-    def add_tab(self, url=None, title="Yeni Sekme"):
-        self._tabs.append({"url": url or QUrl("tabx://newtab"), "title": title})
-        index = len(self._tabs) - 1
-        self._render_tabs()
-        self.setCurrentIndex(index)
-        return index
-
-    def remove_tab(self, index):
-        if 0 <= index < len(self._tabs):
-            self._tabs.pop(index)
-            if index < len(self._views):
-                self._views.pop(index)
-            self._render_tabs()
-            self.setCurrentIndex(min(index, max(0, len(self._tabs) - 1)))
-
-    def setTabText(self, index, text):
-        if 0 <= index < len(self._tabs):
-            self._tabs[index]["title"] = text
-            self._render_tabs()
-
-    def setCurrentIndex(self, index):
-        if 0 <= index < len(self._tabs):
-            self._active_index = index
-            self.tabActivated.emit(index)
-            self._render_tabs()
-
-    def currentIndex(self):
-        return self._active_index
-
-    def count(self):
-        return len(self._tabs)
-
-    def widget(self, index):
-        if 0 <= index < len(self._views):
-            return self._views[index]
-        return None
-
-    def updateViewReference(self, index, view):
-        while len(self._views) <= index:
-            self._views.append(None)
-        self._views[index] = view
-        self._render_tabs()
-
-    def _render_tabs(self):
-        while self.layout.count():
-            child = self.layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-
-        for i, tab_info in enumerate(self._tabs):
-            tab_button = TabButton(
-                title=tab_info["title"],
-                active=i == self._active_index,
-                closable=True,
-            )
-            tab_button.clicked.connect(lambda checked=False, idx=i: self.setCurrentIndex(idx))
-            tab_button.closed.connect(lambda checked=False, idx=i: self.tabClosed.emit(idx))
-            self.layout.addWidget(tab_button)
-
-        add_btn = QPushButton("+")
-        add_btn.setFixedSize(34, 34)
-        add_btn.setToolTip("Yeni sekme")
-        add_btn.setStyleSheet(
-            f"""
-            QPushButton {{
-                border: 1px solid {Theme.border};
-                border-radius: 11px;
-                background-color: {Theme.card};
-                color: {Theme.purple};
-                font-size: 18px;
-                font-weight: 700;
-            }}
-            QPushButton:hover {{
-                background-color: {Theme.purple_soft};
-                border-color: #d9d0ff;
-            }}
-            """
-        )
-        add_btn.clicked.connect(lambda checked=False: self.newTabRequested.emit())
-        self.layout.addWidget(add_btn)
-        self.layout.addStretch(1)
-
-
 class BrowserWindow(QMainWindow):
     """Main browser window."""
 
@@ -501,11 +272,20 @@ class BrowserWindow(QMainWindow):
         self.left_sidebar_open = False
         self.right_sidebar_open = False
         self._load_ui_state()
+        Theme.configure(self.theme_mode)
+        self._setup_privacy_layer()
 
         app = QApplication.instance()
         if app:
             app.setStyleSheet(Theme.qss)
 
+        self.setCentralWidget(self._build_main_shell())
+        self.add_new_tab(QUrl("tabx://newtab"), "Yeni Sekme")
+
+    def _setup_privacy_layer(self):
+        self.privacy = PrivacyService(QWebEngineProfile.defaultProfile())
+
+    def _build_main_shell(self):
         central = QWidget()
         central.setObjectName("root")
         root_layout = QHBoxLayout(central)
@@ -522,12 +302,12 @@ class BrowserWindow(QMainWindow):
         self.right_sidebar.setVisible(False)
         root_layout.addWidget(self.right_sidebar)
         root_layout.addWidget(self._create_right_rail())
-
-        self.setCentralWidget(central)
-        self.add_new_tab(QUrl("tabx://newtab"), "Yeni Sekme")
+        return central
 
     def _load_ui_state(self):
         state = UiStateStore.load()
+        self.theme_mode = state.get("theme_mode", "light")
+        self.tab_position = state.get("tab_position", "top")
         self.custom_nav_items = [
             (str(icon), str(text))
             for icon, text in state.get("custom_nav_items", [])
@@ -554,7 +334,12 @@ class BrowserWindow(QMainWindow):
             ]
 
     def _save_ui_state(self):
-        UiStateStore.save(self.custom_nav_items, self.tab_groups)
+        UiStateStore.save(
+            self.custom_nav_items,
+            self.tab_groups,
+            self.theme_mode,
+            self.tab_position,
+        )
 
     def _create_left_rail(self):
         rail = QFrame()
@@ -613,7 +398,7 @@ class BrowserWindow(QMainWindow):
             QPushButton {{
                 border: 1px solid {Theme.border};
                 border-radius: 14px;
-                background-color: #ffffff;
+                background-color: {Theme.button};
                 color: {Theme.muted};
                 font-size: 12px;
                 font-weight: 900;
@@ -627,7 +412,7 @@ class BrowserWindow(QMainWindow):
         return btn
 
     def _set_rail_button_active(self, btn, active):
-        bg = Theme.purple_soft if active else "#ffffff"
+        bg = Theme.purple_soft if active else Theme.button
         color = Theme.purple if active else Theme.muted
         border = "#d9d0ff" if active else Theme.border
         btn.setStyleSheet(
@@ -662,20 +447,34 @@ class BrowserWindow(QMainWindow):
         layout = QVBoxLayout(center)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        self.center_layout = layout
 
-        self.tabs = TabWidget(self)
+        self.tabs = TabWidget(self, position=self.tab_position)
         self.tabs.tabClosed.connect(self.close_tab)
         self.tabs.tabActivated.connect(self.handle_tab_activated)
         self.tabs.newTabRequested.connect(self.add_new_tab)
-        layout.addWidget(self.tabs)
 
-        layout.addWidget(self._create_toolbar())
+        self.toolbar = self._create_toolbar()
 
         self.web_container = QStackedWidget()
         self.web_container.setStyleSheet("QStackedWidget { border: none; }")
-        layout.addWidget(self.web_container, 1)
+        self._place_center_widgets()
 
         return center
+
+    def _place_center_widgets(self):
+        for widget in (self.tabs, self.toolbar, self.web_container):
+            self.center_layout.removeWidget(widget)
+
+        if self.tab_position == "bottom":
+            self.center_layout.addWidget(self.toolbar)
+            self.center_layout.addWidget(self.web_container, 1)
+            self.center_layout.addWidget(self.tabs)
+        else:
+            self.center_layout.addWidget(self.tabs)
+            self.center_layout.addWidget(self.toolbar)
+            self.center_layout.addWidget(self.web_container, 1)
+        self.tabs.setPosition(self.tab_position)
 
     def _create_toolbar(self):
         container = QFrame()
@@ -684,7 +483,7 @@ class BrowserWindow(QMainWindow):
         container.setStyleSheet(
             f"""
             QFrame#toolbar {{
-                background-color: rgba(251, 251, 254, 0.96);
+                background-color: {Theme.toolbar};
                 border-bottom: 1px solid {Theme.border_soft};
             }}
             """
@@ -710,7 +509,7 @@ class BrowserWindow(QMainWindow):
             QLineEdit {{
                 border: 1px solid {Theme.border};
                 border-radius: 16px;
-                background-color: #ffffff;
+                background-color: {Theme.input};
                 padding: 0 16px;
                 font-size: 14px;
                 font-weight: 550;
@@ -719,20 +518,27 @@ class BrowserWindow(QMainWindow):
             }}
             QLineEdit:focus {{
                 border: 1px solid #b7a7ff;
-                background-color: #ffffff;
+                background-color: {Theme.input};
             }}
             """
         )
         self.address_bar.returnPressed.connect(self.navigate_to_url)
         layout.addWidget(self.address_bar, 1)
 
-        for label, tooltip in [
-            ("☆", "Favori"),
-            ("◈", "Güvenlik"),
-            ("◉", "Profil"),
-            ("⋯", "Menü"),
-        ]:
-            layout.addWidget(self._icon_button(label, tooltip))
+        page_actions = [
+            ("☆", "Favori", None),
+            ("◈", "Güvenlik", None),
+            ("◉", "Profil", None),
+            ("◐", "Açık/koyu tema", self.toggle_theme_mode),
+            ("⇅", "Sekmeleri üste/alta al", self.toggle_tab_position),
+            ("⚙", "Ayarlar", lambda: self.open_internal_page("settings")),
+            ("?", "Hakkında", lambda: self.open_internal_page("about")),
+        ]
+        for label, tooltip, callback in page_actions:
+            btn = self._icon_button(label, tooltip)
+            if callback:
+                btn.clicked.connect(lambda checked=False, action=callback: action())
+            layout.addWidget(btn)
 
         return container
 
@@ -821,7 +627,7 @@ class BrowserWindow(QMainWindow):
             [
                 ("☆", "Favoriler", False),
                 ("◷", "Geçmiş", False),
-                ("⚙", "Ayarlar", False),
+                ("⚙", "Ayarlar", False, lambda: self.open_internal_page("settings")),
             ],
         )
         custom_title = QHBoxLayout()
@@ -929,6 +735,35 @@ class BrowserWindow(QMainWindow):
         self.right_sidebar_open = bool(open_state)
         self.right_sidebar.setVisible(self.right_sidebar_open)
         self._set_rail_button_active(self.right_toggle_btn, self.right_sidebar_open)
+
+    def toggle_theme_mode(self):
+        self.theme_mode = "dark" if self.theme_mode == "light" else "light"
+        self._save_ui_state()
+        self._rebuild_visual_shell()
+
+    def toggle_tab_position(self):
+        self.tab_position = "bottom" if self.tab_position == "top" else "top"
+        self._save_ui_state()
+        self._place_center_widgets()
+
+    def _rebuild_visual_shell(self):
+        current_url = QUrl("tabx://newtab")
+        current_title = "Yeni Sekme"
+        if self.current_view:
+            current_url = self.current_view.url()
+            current_title = self.current_view.title().strip() or current_title
+
+        Theme.configure(self.theme_mode)
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(Theme.qss)
+
+        old_central = self.centralWidget()
+        self.current_view = None
+        self.setCentralWidget(self._build_main_shell())
+        if old_central:
+            old_central.deleteLater()
+        self.add_new_tab(current_url, current_title)
 
     def add_custom_shortcut(self):
         name, ok = TextInputDialog.get_text(self, "Kısayol ekle", "Kısayol adı")
@@ -1060,12 +895,16 @@ class BrowserWindow(QMainWindow):
             f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; margin-top: 8px;"
         )
         layout.addWidget(section)
-        for icon, text, active in items:
-            layout.addWidget(self._sidebar_item(icon, text, active))
+        for item in items:
+            icon, text, active = item[:3]
+            callback = item[3] if len(item) > 3 else None
+            layout.addWidget(self._sidebar_item(icon, text, active, callback))
 
-    def _sidebar_item(self, icon, text, active=False):
+    def _sidebar_item(self, icon, text, active=False, callback=None):
         item = QFrame()
         item.setFixedHeight(34)
+        if callback:
+            item.setCursor(Qt.CursorShape.PointingHandCursor)
         bg = Theme.purple_soft if active else "transparent"
         color = Theme.purple if active else Theme.muted
         item.setStyleSheet(
@@ -1089,6 +928,13 @@ class BrowserWindow(QMainWindow):
         text_label.setStyleSheet(f"font-size: 12px; font-weight: 650; color: {color};")
         layout.addWidget(icon_label)
         layout.addWidget(text_label, 1)
+        if callback:
+            def handle_press(event):
+                if event.button() == Qt.MouseButton.LeftButton:
+                    callback()
+                QFrame.mousePressEvent(item, event)
+
+            item.mousePressEvent = handle_press
         return item
 
     def _tab_group_card(self, group_index, name, count, items):
@@ -1195,7 +1041,7 @@ class BrowserWindow(QMainWindow):
             QPushButton {{
                 border: 1px solid {Theme.border};
                 border-radius: 12px;
-                background-color: #ffffff;
+                background-color: {Theme.button};
                 color: {Theme.muted};
                 font-size: 12px;
                 font-weight: 800;
@@ -1211,6 +1057,9 @@ class BrowserWindow(QMainWindow):
     def add_new_tab(self, url=None, title="Yeni Sekme"):
         if url is None:
             url = QUrl("tabx://newtab")
+        internal_page = self._internal_page_key(url)
+        if internal_page:
+            title = self._internal_page_title(internal_page)
 
         new_view = BrowserTab(self)
         new_view.urlChanged.connect(
@@ -1219,13 +1068,14 @@ class BrowserWindow(QMainWindow):
         new_view.titleChanged.connect(
             lambda text, view=new_view: self._handle_title_changed(view, text)
         )
+        self.privacy.attach_tab(new_view)
 
         index = self.tabs.add_tab(url, title)
         self.tabs.updateViewReference(index, new_view)
         self.web_container.addWidget(new_view)
 
-        if self._is_new_tab_url(url):
-            new_view.setHtml(self._new_tab_html(), QUrl("tabx://newtab"))
+        if internal_page:
+            self._load_internal_page(new_view, internal_page)
         else:
             new_view.setUrl(url)
 
@@ -1264,6 +1114,10 @@ class BrowserWindow(QMainWindow):
             return
         url = QUrl.fromUserInput(text)
         if self.current_view:
+            internal_page = self._internal_page_key(url)
+            if internal_page:
+                self._load_internal_page(self.current_view, internal_page)
+                return
             self.current_view.setUrl(url)
 
     def update_address_bar(self, url):
@@ -1282,7 +1136,10 @@ class BrowserWindow(QMainWindow):
         except ValueError:
             return
         clean_title = title.strip() or "Yeni Sekme"
-        if clean_title.startswith("data:text/html") or self._is_new_tab_url(view.url()):
+        internal_page = self._internal_page_key(view.url())
+        if internal_page:
+            clean_title = self._internal_page_title(internal_page)
+        elif clean_title.startswith("data:text/html"):
             clean_title = "Yeni Sekme"
         self.tabs.setTabText(index, clean_title)
 
@@ -1298,8 +1155,259 @@ class BrowserWindow(QMainWindow):
         if self.current_view and hasattr(self.current_view, "reload"):
             self.current_view.reload()
 
+    def open_internal_page(self, page_key):
+        if not self.current_view:
+            self.add_new_tab(QUrl(f"tabx://{page_key}"))
+            return
+        self._load_internal_page(self.current_view, page_key)
+
+    def _load_internal_page(self, view, page_key):
+        page_key = page_key if page_key in {"newtab", "settings", "about"} else "newtab"
+        view.setHtml(self._internal_page_html(page_key), QUrl(f"tabx://{page_key}"))
+        self.update_address_bar(QUrl(f"tabx://{page_key}"))
+        try:
+            index = self.tabs._views.index(view)
+        except ValueError:
+            return
+        self.tabs.setTabText(index, self._internal_page_title(page_key))
+
+    def _internal_page_key(self, url):
+        if url.scheme() != "tabx":
+            return None
+        key = url.host() or url.path().strip("/")
+        if key in {"newtab", "settings", "about"}:
+            return key
+        return "newtab"
+
+    def _internal_page_title(self, page_key):
+        return {
+            "newtab": "Yeni Sekme",
+            "settings": "Ayarlar",
+            "about": "Hakkında",
+        }.get(page_key, "Yeni Sekme")
+
+    def _internal_page_html(self, page_key):
+        if page_key == "settings":
+            return self._settings_page_html()
+        if page_key == "about":
+            return self._about_page_html()
+        return self._new_tab_html()
+
     def _is_new_tab_url(self, url):
-        return url.scheme() == "tabx" or url.toString() in {"about:blank", ""}
+        return self._internal_page_key(url) == "newtab" or url.toString() in {
+            "about:blank",
+            "",
+        }
+
+    def _internal_page_base_css(self):
+        css = """
+            :root {
+              --bg: __BG__;
+              --card: __CARD__;
+              --line: __BORDER__;
+              --text: __TEXT__;
+              --muted: __MUTED__;
+              --purple: __PURPLE__;
+              --blue: __BLUE__;
+              --green: #18a058;
+              --amber: #b7791f;
+            }
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              min-height: 100vh;
+              font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, Arial, sans-serif;
+              color: var(--text);
+              background: linear-gradient(180deg, __PANEL__ 0%, var(--bg) 100%);
+            }
+            main {
+              width: min(980px, calc(100vw - 80px));
+              margin: 0 auto;
+              padding: 46px 0;
+            }
+            .eyebrow {
+              margin: 0 0 8px;
+              color: var(--purple);
+              font-size: 12px;
+              font-weight: 850;
+              text-transform: uppercase;
+            }
+            h1 {
+              margin: 0;
+              font-size: 34px;
+              line-height: 1.1;
+              letter-spacing: 0;
+            }
+            .subtitle {
+              max-width: 640px;
+              margin: 12px 0 26px;
+              color: var(--muted);
+              font-size: 15px;
+              font-weight: 600;
+              line-height: 1.55;
+            }
+            .grid {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 16px;
+            }
+            .card {
+              min-height: 126px;
+              border: 1px solid var(--line);
+              border-radius: 18px;
+              background: var(--card);
+              padding: 18px;
+              box-shadow: 0 16px 38px rgba(36, 43, 65, .06);
+            }
+            .card h2 {
+              margin: 0 0 8px;
+              font-size: 15px;
+              letter-spacing: 0;
+            }
+            .card p, .card li {
+              color: var(--muted);
+              font-size: 13px;
+              line-height: 1.55;
+            }
+            .card p { margin: 0; }
+            ul {
+              margin: 0;
+              padding-left: 18px;
+            }
+            .pill-row {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 8px;
+              margin-top: 14px;
+            }
+            .pill {
+              border: 1px solid var(--line);
+              border-radius: 999px;
+              background: __BUTTON__;
+              padding: 7px 10px;
+              color: var(--muted);
+              font-size: 12px;
+              font-weight: 750;
+            }
+            .status {
+              color: var(--green);
+              background: rgba(24,160,88,.08);
+              border-color: rgba(24,160,88,.18);
+            }
+            @media (max-width: 760px) {
+              main { width: calc(100vw - 34px); padding: 30px 0; }
+              .grid { grid-template-columns: 1fr; }
+              h1 { font-size: 28px; }
+            }
+        """
+        return (
+            css.replace("__BG__", Theme.bg)
+            .replace("__CARD__", Theme.card)
+            .replace("__BORDER__", Theme.border)
+            .replace("__TEXT__", Theme.text)
+            .replace("__MUTED__", Theme.muted)
+            .replace("__PURPLE__", Theme.purple)
+            .replace("__BLUE__", Theme.blue)
+            .replace("__PANEL__", Theme.panel)
+            .replace("__BUTTON__", Theme.button)
+        )
+
+    def _settings_page_html(self):
+        theme_label = "Koyu tema aktif" if self.theme_mode == "dark" else "Açık tema aktif"
+        tab_position_label = (
+            "Sekmeler altta" if self.tab_position == "bottom" else "Sekmeler üstte"
+        )
+        return f"""
+        <!doctype html>
+        <html lang="tr">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Ayarlar</title>
+          <style>{self._internal_page_base_css()}</style>
+        </head>
+        <body>
+          <main>
+            <p class="eyebrow">TabX İç Sayfa</p>
+            <h1>Ayarlar</h1>
+            <p class="subtitle">F2 ayar merkezi. Tema modu ve sekme konumu artık yerel state'e kaydedilir; toolbar'daki ◐ ve ⇅ kontrolleriyle değiştirilebilir.</p>
+            <section class="grid">
+              <article class="card">
+                <h2>Görünüm</h2>
+                <p>Tema motoru `ui/theme.py` üzerinden çalışır ve açık/koyu token setlerini uygular.</p>
+                <div class="pill-row">
+                  <span class="pill status">{theme_label}</span>
+                  <span class="pill">Kalıcı tercih</span>
+                </div>
+              </article>
+              <article class="card">
+                <h2>Sekmeler</h2>
+                <p>Tab strip `ui/tabs/tab_strip.py` içine ayrıldı. Üst/alt sekme konumu F2 kapsamında çalışır.</p>
+                <div class="pill-row">
+                  <span class="pill status">{tab_position_label}</span>
+                  <span class="pill">Toolbar ⇅</span>
+                </div>
+              </article>
+              <article class="card">
+                <h2>Gizlilik</h2>
+                <p>Ad/tracker blocker, HTTPS upgrade, izinler ve site verisi temizleme F3 içinde bağlanacak.</p>
+              </article>
+              <article class="card">
+                <h2>Arama</h2>
+                <p>Varsayılan arama motoru, omnibox önerileri ve geçmiş bazlı tamamlama burada ayarlanacak.</p>
+              </article>
+            </section>
+          </main>
+        </body>
+        </html>
+        """
+
+    def _about_page_html(self):
+        return f"""
+        <!doctype html>
+        <html lang="tr">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Hakkında</title>
+          <style>{self._internal_page_base_css()}</style>
+        </head>
+        <body>
+          <main>
+            <p class="eyebrow">TabX Browser</p>
+            <h1>Geliştiriciler için özelleştirilebilir tarayıcı</h1>
+            <p class="subtitle">TabX, PyQt6 ve QtWebEngine üzerinde ilerleyen, gizlilik odaklı ve modüler bir masaüstü tarayıcı projesidir.</p>
+            <section class="grid">
+              <article class="card">
+                <h2>Durum</h2>
+                <ul>
+                  <li>F1 çekirdek tarayıcı çalışıyor.</li>
+                  <li>F2 görsel kabuk geliştiriliyor.</li>
+                  <li>F3 gizlilik katmanı sıradaki büyük faz.</li>
+                </ul>
+              </article>
+              <article class="card">
+                <h2>Teknoloji</h2>
+                <div class="pill-row">
+                  <span class="pill">Python 3.11+</span>
+                  <span class="pill">PyQt6</span>
+                  <span class="pill">QtWebEngine</span>
+                  <span class="pill">SQLite hedef</span>
+                </div>
+              </article>
+              <article class="card">
+                <h2>Sınırlar</h2>
+                <p>Chromium fork yok. Chrome Web Store native extension desteği yok. Eklenti sistemi TabX'e özel JS/CSS injection ile tasarlanacak.</p>
+              </article>
+              <article class="card">
+                <h2>Öncelik</h2>
+                <p>Önce firma içi pilot için çalışan, hızlı ve gösterilebilir küçük parçalar.</p>
+              </article>
+            </section>
+          </main>
+        </body>
+        </html>
+        """
 
     def _new_tab_html(self):
         return """
@@ -1355,7 +1463,7 @@ class BrowserWindow(QMainWindow):
               place-items: center;
               margin: 0 auto 12px;
               border-radius: 22px;
-              background: linear-gradient(145deg, #ffffff, #eeeaff);
+              background: linear-gradient(145deg, {Theme.card}, {Theme.purple_soft});
               border: 1px solid rgba(124,92,255,.18);
               box-shadow: 0 18px 48px rgba(74, 63, 128, .12);
               color: var(--purple);
