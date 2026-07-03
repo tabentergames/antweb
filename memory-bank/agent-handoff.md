@@ -4,6 +4,12 @@ Son guncelleme: 2026-07-03
 
 ## Son kararlar
 
+- **Toolbar duzeni + profil cipi (2026-07-03, kullanici geri bildirimi):** toolbar'daki
+  mukerrer butonlar temizlendi (◉ ve ⚙ ikisi de settings aciyordu); az kullanilanlar
+  `⋯` QMenu'sune indi. Aktif profil sag ucta cip olarak gorunur; cip menusu profil
+  gecisi + yeni profil sunar. QMenu stilleri `_menu_style()` uzerinden token-bazli —
+  yeni menu eklerken bunu kullan. Cip metni `switch_profile` icinde
+  `_update_profile_chip()` ile guncellenir.
 - **F2.5 tab strip animasyonlari tamamlandi (2026-07-03):** ekle/kapat genislik
   animasyonu (`Motion.BASE`), hover renk gecisi (`Motion.FAST`, `hoverProgress`
   pyqtProperty + `Theme.mix`). Kapatma deseni: `TabWidget._request_close` once

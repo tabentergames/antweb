@@ -37,6 +37,7 @@ Son guncelleme: 2026-07-03
   - **F4 — Workspace:** sag panelde "Calisma Alanlari" bolumu; workspace basina sekme seti, gecis/ekle/sil.
   - **F4 — History:** `features/library/store.py` (SQLite, `data/library-<profil>.db`); loadFinished'te kayit, `tabx://history` sayfasi + temizleme.
   - **F4 — Bookmarks:** ayni SQLite katmani; toolbar ☆/★ toggle, `tabx://bookmarks` sayfasi + silme.
+  - **Toolbar duzeni + profil cipi:** toolbar gezinme | adres | sayfa islemleri | profil olarak ayiricilarla gruplu; az kullanilan eylemler (sekme konumu, ayarlar, hakkinda) `⋯` menusunde. Sag ucta aktif profili gosteren cip: tiklayinca profil gecis menusu (aktif isaretli) + "Yeni profil…". `_menu_style()` QMenu'ler icin ortak token-bazli stil.
   - **tabx:// yonlendirme:** `TabXPage.acceptNavigationRequest` ic linkleri sinyalle kabuga tasir (`_handle_internal_url`); komut linkleri: `history/clear`, `bookmarks/remove?id=`, `settings/profile?name=`, `settings/profile-new`.
 
 ## Ana teknik borc

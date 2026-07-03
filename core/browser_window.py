@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QPushButton,
     QStackedWidget,
     QVBoxLayout,
@@ -602,8 +603,10 @@ class BrowserWindow(QMainWindow):
             """
         )
         layout = QHBoxLayout(container)
-        layout.setContentsMargins(18, 12, 18, 12)
-        layout.setSpacing(10)
+        layout.setContentsMargins(
+            Theme.SPACE_LG, Theme.SPACE_MD, Theme.SPACE_LG, Theme.SPACE_MD
+        )
+        layout.setSpacing(Theme.SPACE_SM)
 
         for label, callback, tooltip in [
             ("←", self.go_back, "Geri"),
@@ -642,21 +645,114 @@ class BrowserWindow(QMainWindow):
         self.bookmark_btn.clicked.connect(lambda checked=False: self.toggle_bookmark())
         layout.addWidget(self.bookmark_btn)
 
+        layout.addWidget(self._toolbar_separator())
+
+        # Sayfa islemleri: sik kullanilanlar ikon olarak kalir, gerisi
+        # "⋯" menusune iner — toolbar kalabaligini azaltir.
         page_actions = [
             ("◷", "Geçmiş", lambda: self.open_internal_page("history")),
-            ("◉", "Profil", lambda: self.open_internal_page("settings")),
             ("◐", "Açık/koyu tema", self.toggle_theme_mode),
-            ("⇅", "Sekmeleri üste/alta al", self.toggle_tab_position),
-            ("⚙", "Ayarlar", lambda: self.open_internal_page("settings")),
-            ("?", "Hakkında", lambda: self.open_internal_page("about")),
         ]
         for label, tooltip, callback in page_actions:
             btn = self._icon_button(label, tooltip)
-            if callback:
-                btn.clicked.connect(lambda checked=False, action=callback: action())
+            btn.clicked.connect(lambda checked=False, action=callback: action())
             layout.addWidget(btn)
 
+        more_btn = self._icon_button("⋯", "Daha fazla")
+        more_menu = QMenu(more_btn)
+        more_menu.setStyleSheet(self._menu_style())
+        more_menu.addAction("⇅  Sekmeleri üste/alta al", self.toggle_tab_position)
+        more_menu.addAction("⚙  Ayarlar", lambda: self.open_internal_page("settings"))
+        more_menu.addAction("?  Hakkında", lambda: self.open_internal_page("about"))
+        more_btn.setMenu(more_menu)
+        layout.addWidget(more_btn)
+
+        layout.addWidget(self._toolbar_separator())
+
+        # Aktif profil cipi: hangi profilde oldugun her zaman gorunur;
+        # tiklayinca profil gecis menusu acilir.
+        self.profile_chip = QPushButton()
+        self.profile_chip.setFixedHeight(36)
+        self.profile_chip.setStyleSheet(
+            f"""
+            QPushButton {{
+                border: 1px solid {Theme.purple};
+                border-radius: {Theme.RADIUS_LG}px;
+                background-color: {Theme.purple_soft};
+                color: {Theme.purple};
+                font-size: 12px;
+                font-weight: 700;
+                padding: 0 {Theme.SPACE_LG}px;
+            }}
+            QPushButton::menu-indicator {{ width: 0px; }}
+            QPushButton:hover {{
+                background-color: {Theme.purple};
+                color: {Theme.card};
+            }}
+            """
+        )
+        self.profile_menu = QMenu(self.profile_chip)
+        self.profile_menu.setStyleSheet(self._menu_style())
+        self.profile_menu.aboutToShow.connect(self._populate_profile_menu)
+        self.profile_chip.setMenu(self.profile_menu)
+        self._update_profile_chip()
+        layout.addWidget(self.profile_chip)
+
         return container
+
+    def _toolbar_separator(self):
+        line = QFrame()
+        line.setFixedSize(1, 24)
+        line.setStyleSheet(f"background-color: {Theme.border_soft}; border: none;")
+        return line
+
+    def _menu_style(self):
+        return f"""
+            QMenu {{
+                background-color: {Theme.card};
+                border: 1px solid {Theme.border};
+                border-radius: {Theme.RADIUS_SM}px;
+                padding: {Theme.SPACE_XS}px;
+            }}
+            QMenu::item {{
+                padding: {Theme.SPACE_SM}px {Theme.SPACE_LG}px;
+                border-radius: {Theme.RADIUS_SM}px;
+                color: {Theme.text};
+                font-size: 13px;
+            }}
+            QMenu::item:selected {{
+                background-color: {Theme.purple_soft};
+                color: {Theme.purple};
+            }}
+            QMenu::separator {{
+                height: 1px;
+                background: {Theme.border_soft};
+                margin: {Theme.SPACE_XS}px {Theme.SPACE_SM}px;
+            }}
+        """
+
+    def _update_profile_chip(self):
+        if not hasattr(self, "profile_chip"):
+            return
+        self.profile_chip.setText(f"◉ {self.profile_name}")
+        self.profile_chip.setToolTip(
+            f"Aktif profil: {self.profile_name} — değiştirmek için tıkla"
+        )
+
+    def _populate_profile_menu(self):
+        self.profile_menu.clear()
+        for name in self.profiles:
+            action = self.profile_menu.addAction(name)
+            action.setCheckable(True)
+            action.setChecked(name == self.profile_name)
+            action.triggered.connect(
+                lambda checked=False, profile=name: self.switch_profile(profile)
+            )
+        self.profile_menu.addSeparator()
+        self.profile_menu.addAction("＋ Yeni profil…", self.add_profile)
+        self.profile_menu.addAction(
+            "⚙ Profil ayarları", lambda: self.open_internal_page("settings")
+        )
 
     def _create_left_sidebar(self):
         sidebar = QFrame()
@@ -912,6 +1008,7 @@ class BrowserWindow(QMainWindow):
         self._reset_tabs()
         self._restore_session()
         self._render_workspaces()
+        self._update_profile_chip()
 
     def add_workspace(self):
         name, ok = TextInputDialog.get_text(self, "Yeni çalışma alanı", "Alan adı")

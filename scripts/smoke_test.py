@@ -64,6 +64,11 @@ def run() -> int:
     window.switch_workspace("Genel")
     SessionStore.remove_workspace(window.profile_name, "SmokeWS")
 
+    # Toolbar — profil cipi aktif profili gosterir, menu dolu gelir.
+    assert window.profile_name in window.profile_chip.text(), "profil cipi adi gostermiyor"
+    window._populate_profile_menu()
+    assert window.profile_menu.actions(), "profil menusu bos"
+
     # F2.5 — tab strip ekle/kapat: once reduced-motion yolu (deterministik).
     before = window.tabs.count()
     window.add_new_tab()

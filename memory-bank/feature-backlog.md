@@ -89,6 +89,7 @@ Her biri kapatilabilir modul olarak `features/` altina gider; cekirdege gomulmez
 | Durum | Is | Not |
 | --- | --- | --- |
 | next | Downloads sayfasi | Indirme listesi, duraklat/devam, klasorde goster. |
+| done | Toolbar duzeni + profil cipi | Butonlar gruplu (`⋯` overflow menusu), aktif profil toolbar'da cip olarak gorunur; cip menusunden profil gecisi/ekleme. |
 | done | Settings sayfasi | `tabx://settings` ic route olarak basladi; gercek ayar kontrolleri sonraki dilim. |
 | done | About sayfasi | `tabx://about` ic route olarak basladi; surum/build bilgisi otomatik degil. |
 | todo | Error page | Ag/sertifika hata sayfalari icin TabX tasarimi. |
