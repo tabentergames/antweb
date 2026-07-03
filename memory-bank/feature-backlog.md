@@ -13,6 +13,24 @@ Durum etiketleri: `todo`, `next`, `in-progress`, `done`, `blocked`.
 | done | UI bileşenlerini ayir | `Theme`, `TabButton`, `TabWidget` `ui/` altina alindi; sidebar/dialog ayrimi sonraki teknik borc. |
 | done | Ayarlar sayfasi ilk yuzey | `tabx://settings` route'u ve toolbar/sol panel erisimi var; kontroller henuz kalici state'e bagli degil. |
 
+## F2.5 - Motion & Gorsel Tutarlilik
+
+Kurallar: `docs/DESIGN_SYSTEM.md`. Motion altyapisina dokunan isler SIRALI yurutulur.
+
+| Durum | Is | Not |
+| --- | --- | --- |
+| done | Motion token katmani | `ui/motion.py` — sure/easing tokenlari, `animate`, `slide_panel`, `fade_in`, `snapshot_of`. |
+| done | Tasarim tokenlari genisletildi | `ui/theme.py` — SPACE/RADIUS skalalari + glass/scrim seffaf yuzey renkleri (light+dark). |
+| done | Panel ac/kapa animasyonu | Sol/sag sidebar `slide_panel` ile kayarak acilir; genislikler sinif sabiti oldu. |
+| done | Offscreen smoke test | `scripts/smoke_test.py` — pencere kurulumu, panel toggle, tema degisimi. |
+| next | Tab strip animasyonlari | Sekme ekle/kapat/hover gecisleri; `ui/tabs/tab_strip.py` icinde Motion tokenlariyla. |
+| todo | Snapshot sekme gecisi | Aktif sekme degisiminde `snapshot_of` + slide/fade; webview'e efekt YOK. |
+| todo | Fan sekme modu | F2'den ertelenen "vay be" ozelligi; snapshot deseni uzerine kurulur. |
+| todo | Glass yuzey gecisi | Overlay panel/dialog/toolbar'i `Theme.glass*` tokenlarina tasi. |
+| todo | Reduced-motion ayari | `tabx://settings` toggle -> `Motion.configure`; `data/ui_state.json`'a yazilir. |
+| todo | Cikis/giris sayfa gecisi | Yeni sekme dashboard'una acilirken yumusak giris animasyonu. |
+| todo | Frameless kabuk arastirmasi | FramelessWindowHint + macOS trafik isiklari/surukleme; ayri arastirma dilimi, dogrudan uygulama yazma. |
+
 ## F3 - Gizlilik
 
 | Durum | Is | Not |
@@ -50,6 +68,21 @@ Durum etiketleri: `todo`, `next`, `in-progress`, `done`, `blocked`.
 | todo | User-agent gecisi | Sekme veya profil bazli. |
 | todo | Network/request capture | MVP icin URL/interceptor log paneli. |
 | todo | DevTools entegrasyonu | QtWebEngine DevTools penceresi veya paneli. |
+
+## F7 - Power UX (Opera-benzeri yetenekler)
+
+Her biri kapatilabilir modul olarak `features/` altina gider; cekirdege gomulmez.
+
+| Durum | Is | Not |
+| --- | --- | --- |
+| todo | Split view | Iki sekmeyi yan yana gosterme; QSplitter + snapshot gecis animasyonu. |
+| todo | Video pop-out | Videoyu her zaman ustte kucuk pencereye alma (picture-in-picture). |
+| todo | Sidebar web panelleri | Opera tarzi: sol rail'e sabitlenen dar webview panelleri (WhatsApp/Telegram vb.). |
+| todo | Komut paleti | Ctrl/Cmd+K — sekme/ayar/komut arama; `Theme.glass_strong` overlay. |
+| todo | Mouse gestures | Sag tus + hareketle geri/ileri/kapat; ayarlardan kapatilabilir. |
+| todo | Speed dial genisletme | Yeni sekme dashboard'una duzenlenebilir kisayol kartlari + arka plan. |
+| todo | Sekme adalari (tab islands) | Ayni baglamdaki sekmeleri strip uzerinde gorsel gruplama; F4 workspace ile uyumlu. |
+| todo | Ekran goruntusu araci | Gorunur alan/tam sayfa yakalama + panoya/dosyaya kaydet. |
 
 ## Temel tarayici yuzeyleri
 

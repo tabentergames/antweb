@@ -19,11 +19,13 @@ Tüm mimari kararlar, geliştirme sırası, kurallar ve "yapma listesi" orada ta
 
 ## Altın kurallar
 
-1. `python3 main.py` her zaman çalışmalı — yarım/derlenmeyen kod bırakma.
+1. `python3 main.py` **ve** `python3 scripts/smoke_test.py` her zaman çalışmalı — yarım/derlenmeyen kod bırakma.
 2. Tek seferde tek modül/özellik. Fazları karıştırma.
 3. Çekirdeğe (`core/`) özellik gömme; özellikler `features/` altına gider.
 4. Değişiklik yaptıysan README ve gerekirse `docs/AGENT_WORKFLOW.md`yi güncelle.
 5. Chromium fork'una / `chrome.*` uzantı desteğine yönelik kod yazma.
+6. **UI'ye dokunuyorsan önce [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) oku.**
+   Renk/spacing/radius `Theme`'den, süre/easing `Motion`'dan gelir; webview'e efekt uygulanmaz.
 
 ## ✅ F0 → F1 Tamamlandı (2026-06-13)
 
@@ -41,3 +43,15 @@ Tüm mimari kararlar, geliştirme sırası, kurallar ve "yapma listesi" orada ta
 
 **Sonraki adım:** F2 — Görsel & Sekmeler (tema motoru + fan sekme modu)
 Detaylar için `docs/AGENT_WORKFLOW.md` §3.
+
+## ✅ F2 → F3 → F2.5 Tamamlandı (2026-07-03)
+
+**Tamamlanan:**
+- **F2:** tema motoru (`ui/theme.py`), tab strip (`ui/tabs/`), esnek sekme konumu, açık/koyu tema.
+- **F3:** ad/tracker blocker, HTTPS upgrade, TabX eklenti runtime (`features/`).
+- **F2.5 (görsel katman):** motion tokenları (`ui/motion.py`), spacing/radius/glass tokenları,
+  animasyonlu sol/sağ paneller, `docs/DESIGN_SYSTEM.md`, `scripts/smoke_test.py`.
+
+**Güncel görev sırası:** `memory-bank/agent-handoff.md` + `memory-bank/feature-backlog.md`.
+Sıradaki iş: **F2.5 tab strip animasyonları** (paralel yürütülebilir: F3 ayar toggle'ları).
+Opera-benzeri yetenekler **F7 — Power UX** olarak backlog'da.

@@ -77,9 +77,14 @@ Sıralamayı bozma. Bir faz "Tamamlanma Kriteri"ni karşılamadan sonrakine geç
 | **F1 — Çekirdek (MVP)**     | Gerçek tarayıcı | Sekme aç/kapat, adres çubuğu, ileri/geri/yenile, gezinme çalışıyor. Birden fazla sekme stabil.                          |
 | **F2 — Görsel & Sekmeler**  | İlk "vay be"    | Tema motoru (açık/koyu) + fan sekme modu VEYA esnek sekme konumu. Akıcı, animasyonlu.                                   |
 | **F3 — Gizlilik**           | Güven           | TabX eklenti sistemi altyapısı + temel ad/tracker blocking + HTTPS upgrade.                                             |
+| **F2.5 — Motion & Görsel Sistem** | Akışkanlık | `ui/motion.py` + tasarım token'ları + `docs/DESIGN_SYSTEM.md` kuruldu; panel/sekme/sayfa geçişleri animasyonlu; reduced-motion ayarı var. |
 | **F4 — Profil & Workspace** | Çoklu bağlam    | Çoklu profil, oturum kaydet/geri yükle, sekme grupları.                                                                 |
 | **F5 — Productivity**       | Üretkenlik      | Floating todo widget + Kanban. Modüler, kapatılabilir.                                                                  |
 | **F6 — Dev Araçları**       | Geliştirici     | Snippet kütüphanesi, istek yakalama, user-agent geçişi.                                                                 |
+| **F7 — Power UX (Opera-benzeri)** | Fark yaratan yetenekler | Split view, video pop-out, sidebar web panelleri, mouse gestures, komut paleti. Her biri kapatılabilir modül.       |
+
+> **Not:** F2.5, F3'ten sonra retro-fit edilen görsel katmandır; F4 ve sonrası UI işleri
+> F2.5 token'larını kullanmak zorundadır (bkz. `docs/DESIGN_SYSTEM.md`).
 
 > **MVP tanımı (firmaya ilk gösterim):** F1 + F2'nin tamamı + F3'ten temel ad-blocker.
 > Yani: çalışan hızlı tarayıcı + bir görsel "vay be" özelliği + temel gizlilik.
@@ -98,6 +103,11 @@ Her agent bir göreve başlarken:
 6. **Test et.** Mümkünse `tests/` altına test ekle, mevcut testleri çalıştır.
 7. **Belgeyi güncelle.** Yeni modül/komut eklediysen README, memory bank ve gerekirse bu dosyayı güncelle.
 8. **Sade kod yaz.** Gereksiz soyutlama yok. Yorum yalnızca gerçekten gerekliyse.
+9. **UI'ye dokunuyorsan [`docs/DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) oku.** Renk/spacing/radius `Theme`'den,
+   süre/easing `Motion`'dan gelir; sabit kodlanmış görsel değer kabul edilmez. Webview üzerine
+   efekt/transform uygulanmaz — geçişler snapshot deseniyle yapılır.
+10. **Teslimden önce `python3 scripts/smoke_test.py` çalıştır.** GUI doğrulaması yapamıyorsan
+    teslim notunda hangi adımın manuel test edilmesi gerektiğini açıkça yaz.
 
 ### Görev şablonu (her PR/commit için)
 
@@ -135,16 +145,17 @@ Sonraki adım: <varsa bir sonraki agent için not>
 
 ## 7. ✅ Bir Sonraki Agent İçin Başlangıç Görevi
 
-Şu an repo yalnızca dokümantasyon içeriyor (kod yok). **İlk somut görev (F0 → F1):**
+> Güncel görev sırası **`memory-bank/agent-handoff.md`** ve
+> **`memory-bank/feature-backlog.md`** dosyalarında tutulur; oraya bak.
+> F0–F3 tamamlandı, F2.5 (motion katmanı) altyapısı kuruldu.
 
-1. `requirements.txt` oluştur (`PyQt6`, `PyQt6-WebEngine`).
-2. `main.py` + `core/` ile **çalışan minimal QtWebEngine tarayıcısı** kur:
-   - Adres çubuğu, git/yenile/ileri/geri butonları.
-   - Çoklu sekme (yeni sekme, sekme kapatma).
-3. `python main.py` ile açılıp gezinilebildiğini doğrula.
-4. README'deki kurulum adımlarının gerçekten çalıştığını teyit et.
+Görev seçme kuralları:
 
-Bu görev tamamlanınca F2 (tema motoru + fan sekme modu) için yeni görev aç.
+1. Backlog'daki `next` etiketli işten başla; yoksa `todo` içinden **tek** iş seç.
+2. F2.5 animasyon görevleri sıralıdır: tab strip animasyonları → snapshot sekme geçişi →
+   fan modu. Motion altyapısına dokunan işleri paralel yürütme.
+3. Birbirinden bağımsız modüller (ör. F3 ayar toggle'ları + F2.5 tab strip) paralel
+   çalışılabilir; aynı dosyaya dokunan işler sıralı gider.
 
 ---
 

@@ -20,6 +20,7 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 
 # F3 privacy layer
 from features.privacy.service import PrivacyService
+from ui.motion import Motion, slide_panel
 from ui.tabs.tab_strip import TabWidget
 from ui.theme import Theme
 from PyQt6.QtWidgets import (
@@ -262,6 +263,9 @@ class BrowserTab(QWebEngineView):
 
 class BrowserWindow(QMainWindow):
     """Main browser window."""
+
+    LEFT_SIDEBAR_WIDTH = 238
+    RIGHT_SIDEBAR_WIDTH = 258
 
     def __init__(self):
         super().__init__()
@@ -545,7 +549,7 @@ class BrowserWindow(QMainWindow):
     def _create_left_sidebar(self):
         sidebar = QFrame()
         sidebar.setObjectName("leftSidebar")
-        sidebar.setFixedWidth(238)
+        sidebar.setFixedWidth(self.LEFT_SIDEBAR_WIDTH)
         sidebar.setStyleSheet(
             f"""
             QFrame#leftSidebar {{
@@ -677,7 +681,7 @@ class BrowserWindow(QMainWindow):
     def _create_right_sidebar(self):
         sidebar = QFrame()
         sidebar.setObjectName("rightSidebar")
-        sidebar.setFixedWidth(258)
+        sidebar.setFixedWidth(self.RIGHT_SIDEBAR_WIDTH)
         sidebar.setStyleSheet(
             f"""
             QFrame#rightSidebar {{
@@ -726,14 +730,14 @@ class BrowserWindow(QMainWindow):
         if open_state is None:
             open_state = not self.left_sidebar_open
         self.left_sidebar_open = bool(open_state)
-        self.left_sidebar.setVisible(self.left_sidebar_open)
+        slide_panel(self.left_sidebar, self.left_sidebar_open, self.LEFT_SIDEBAR_WIDTH)
         self._set_rail_button_active(self.left_toggle_btn, self.left_sidebar_open)
 
     def toggle_right_sidebar(self, open_state=None):
         if open_state is None:
             open_state = not self.right_sidebar_open
         self.right_sidebar_open = bool(open_state)
-        self.right_sidebar.setVisible(self.right_sidebar_open)
+        slide_panel(self.right_sidebar, self.right_sidebar_open, self.RIGHT_SIDEBAR_WIDTH)
         self._set_rail_button_active(self.right_toggle_btn, self.right_sidebar_open)
 
     def toggle_theme_mode(self):

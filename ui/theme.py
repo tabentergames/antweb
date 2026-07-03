@@ -6,6 +6,19 @@ class Theme:
 
     _mode = "light"
 
+    # Bosluk skalasi (px) — layout margin/spacing degerleri buradan secilir.
+    SPACE_XS = 4
+    SPACE_SM = 8
+    SPACE_MD = 12
+    SPACE_LG = 16
+    SPACE_XL = 24
+
+    # Kose yaricapi skalasi (px).
+    RADIUS_SM = 8
+    RADIUS_MD = 12
+    RADIUS_LG = 18
+    RADIUS_PILL = 999
+
     _palettes = {
         "light": {
             "bg": "#f6f7fb",
@@ -28,6 +41,12 @@ class Theme:
             "input": "#ffffff",
             "toolbar": "rgba(251, 251, 254, 0.96)",
             "shadow": "rgba(31, 41, 55, 0.08)",
+            # Seffaf (glass) yuzeyler — panel/overlay'lerde duz panel rengi
+            # yerine bunlar kullanilirsa altta kalan icerik hissedilir.
+            "glass": "rgba(251, 251, 254, 0.78)",
+            "glass_strong": "rgba(251, 251, 254, 0.92)",
+            "glass_border": "rgba(23, 32, 51, 0.10)",
+            "scrim": "rgba(23, 32, 51, 0.32)",
         },
         "dark": {
             "bg": "#10131a",
@@ -50,6 +69,10 @@ class Theme:
             "input": "#111722",
             "toolbar": "rgba(23, 27, 36, 0.96)",
             "shadow": "rgba(0, 0, 0, 0.24)",
+            "glass": "rgba(23, 27, 36, 0.72)",
+            "glass_strong": "rgba(23, 27, 36, 0.90)",
+            "glass_border": "rgba(238, 242, 248, 0.10)",
+            "scrim": "rgba(0, 0, 0, 0.45)",
         },
     }
 

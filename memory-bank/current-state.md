@@ -1,6 +1,6 @@
 # Current State
 
-Son guncelleme: 2026-07-02
+Son guncelleme: 2026-07-03
 
 ## Repodaki gercek durum
 
@@ -26,6 +26,11 @@ Son guncelleme: 2026-07-02
   - F3 bilesenleri `BrowserWindow._setup_privacy_layer()` ile default QWebEngineProfile'a baglanmis durumda.
   - UI state kaydi: `data/ui_state.json`.
   - macOS app build script: `scripts/build_macos_app.py`.
+  - **F2.5 motion katmani:** `ui/motion.py` — sure/easing tokenlari, `animate`, `slide_panel`, `fade_in`, `snapshot_of`; `Motion.configure(False)` ile reduced-motion yolu.
+  - **F2.5 tasarim tokenlari:** `ui/theme.py` — SPACE_XS..XL, RADIUS_SM..PILL sabitleri + light/dark `glass`, `glass_strong`, `glass_border`, `scrim` seffaf yuzey renkleri.
+  - Sol/sag sidebar `slide_panel` ile animasyonlu acilip kapaniyor; genislikler `BrowserWindow.LEFT/RIGHT_SIDEBAR_WIDTH` sabitlerinde.
+  - **Gorsel tutarlilik anayasasi:** `docs/DESIGN_SYSTEM.md` — token kullanimi, hareket dili, webview snapshot deseni, UI teslim kontrol listesi.
+  - **Smoke test:** `scripts/smoke_test.py` — offscreen pencere kurulumu, panel toggle, tema degisimi.
 
 ## Ana teknik borc
 
@@ -34,7 +39,9 @@ Son guncelleme: 2026-07-02
 - Fan sekme modu yok; F2 tamamlanma kriteri esnek sekme konumu ile karsilandi.
 - F3 gizlilik ozellikleri calisir durumda; ancak ayarlar sayfasinda toggle UI'i yok.
 - Profil, workspace, oturum restore, history, bookmarks ve downloads yok.
-- Test paketi yok; en azindan smoke ve state-store testleri eklenmeli.
+- Test paketi olarak yalnizca `scripts/smoke_test.py` var; `tests/` altinda state-store ve motion testleri eklenmeli.
+- Tab strip, toolbar ve dialoglar henuz Motion/SPACE/RADIUS tokenlarini kullanmiyor (kademeli goc surecek).
+- Reduced-motion icin ayarlar sayfasinda toggle yok; `Motion.configure` yalnizca kod tarafinda.
 
 ## Cikis kriteri
 
@@ -42,6 +49,9 @@ Her degisiklikten sonra:
 
 ```bash
 python3 main.py
+python3 scripts/smoke_test.py
 ```
 
-uygulama penceresini acabilmeli. GUI testleri mumkun degilse agent bunu teslim notunda acikca belirtmeli.
+ikisi de gecmeli. UI degisikliklerinde `docs/DESIGN_SYSTEM.md` §7 kontrol listesi uygulanir;
+animasyon gorsel olarak dogrulanamadiysa agent teslim notunda hangi adimin manuel test
+edilecegini acikca belirtmeli.
