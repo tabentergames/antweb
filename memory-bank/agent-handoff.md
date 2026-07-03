@@ -4,6 +4,14 @@ Son guncelleme: 2026-07-03
 
 ## Son kararlar
 
+- **F2.5 tab strip animasyonlari tamamlandi (2026-07-03):** ekle/kapat genislik
+  animasyonu (`Motion.BASE`), hover renk gecisi (`Motion.FAST`, `hoverProgress`
+  pyqtProperty + `Theme.mix`). Kapatma deseni: `TabWidget._request_close` once
+  butonu daraltir, `tabClosed` sinyali animasyon BITIMINDE yayilir — kabuk
+  (`close_tab`) degismedi. `_render_tabs` ayni event-loop turunda birden cok kez
+  kosabildigi icin giris animasyonu `_appear_index` bayragi + `QTimer.singleShot(0)`
+  temizligi ile kurulur; bu deseni koru. QSS `:hover` tab butonundan kaldirildi,
+  hover artik programatik.
 - **F4 tamamlandi (2026-07-03):** oturum restore (`core/session.py`), profiller (izole
   QWebEngineProfile), workspace'ler (sag panel), history + bookmarks
   (`features/library/store.py`, SQLite). Ic sayfa komutlari `TabXPage` navigasyon
@@ -24,20 +32,19 @@ Son guncelleme: 2026-07-03
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-Faz: F2.5 | Modul: `ui/tabs` | Kapsam: tab strip animasyonlari (sekme ekle/kapat/hover).
-(F4 bitti; asagidaki F2.5 gorevi hala siradaki is. Paralel ikinci is: Downloads sayfasi
-veya F3 ayar toggle'lari.)
+Faz: F2.5 | Modul: `ui/tabs` + `core/browser_window.py` | Kapsam: snapshot sekme gecisi.
+(Tab strip animasyonlari bitti; animasyon sirasi geregi siradaki is bu.)
 
 Neden:
 
-- Motion altyapisi hazir; ilk gorunur "akiskanlik" kazanci tab strip'te.
-- Snapshot sekme gecisi ve fan modu bu isin uzerine kurulacak.
+- Animasyon gorevleri SIRALI: tab strip -> snapshot gecisi -> fan modu.
+- `snapshot_of()` yardimcisi hazir; desen DESIGN_SYSTEM.md §4'te tanimli.
 
 Net teslim kriteri:
 
-- Sekme ekleme/kapatma `Motion.BASE`, hover `Motion.FAST` ile animasyonlu.
-- Sure/easing degerleri yalnizca `Motion` tokenlarindan; renkler `Theme`'den.
-- `Motion.configure(False)` iken davranis animasyonsuz ve dogru.
+- Aktif sekme degisiminde eski view'in snapshot'i uzerinde slide/fade (`Motion.SLOW`).
+- Webview'e opacity/transform/QGraphicsEffect UYGULANMAZ; yalnizca snapshot QLabel anime edilir.
+- `Motion.configure(False)` iken gecis anlik ve dogru.
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor; light+dark modda gozle bakildi.
 
 Paralel yurutulebilir ikinci gorev (farkli dosyalar):

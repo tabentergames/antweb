@@ -23,8 +23,8 @@ Kurallar: `docs/DESIGN_SYSTEM.md`. Motion altyapisina dokunan isler SIRALI yurut
 | done | Tasarim tokenlari genisletildi | `ui/theme.py` — SPACE/RADIUS skalalari + glass/scrim seffaf yuzey renkleri (light+dark). |
 | done | Panel ac/kapa animasyonu | Sol/sag sidebar `slide_panel` ile kayarak acilir; genislikler sinif sabiti oldu. |
 | done | Offscreen smoke test | `scripts/smoke_test.py` — pencere kurulumu, panel toggle, tema degisimi. |
-| next | Tab strip animasyonlari | Sekme ekle/kapat/hover gecisleri; `ui/tabs/tab_strip.py` icinde Motion tokenlariyla. |
-| todo | Snapshot sekme gecisi | Aktif sekme degisiminde `snapshot_of` + slide/fade; webview'e efekt YOK. |
+| done | Tab strip animasyonlari | Ekle/kapat `Motion.BASE` genislik animasyonu, hover `Motion.FAST` + `Theme.mix` renk gecisi; reduced-motion yolu smoke test'te. |
+| next | Snapshot sekme gecisi | Aktif sekme degisiminde `snapshot_of` + slide/fade; webview'e efekt YOK. |
 | todo | Fan sekme modu | F2'den ertelenen "vay be" ozelligi; snapshot deseni uzerine kurulur. |
 | todo | Glass yuzey gecisi | Overlay panel/dialog/toolbar'i `Theme.glass*` tokenlarina tasi. |
 | todo | Reduced-motion ayari | `tabx://settings` toggle -> `Motion.configure`; `data/ui_state.json`'a yazilir. |

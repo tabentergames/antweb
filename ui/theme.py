@@ -76,6 +76,22 @@ class Theme:
         },
     }
 
+    @staticmethod
+    def mix(color_a, color_b, t):
+        """Iki hex rengi t (0..1) oraninda karistirir.
+
+        Hover gibi animasyonlu renk gecislerinde ara kareleri uretmek icin;
+        yalnizca '#rrggbb' bicimindeki tokenlarla calisir (rgba degil).
+        """
+        t = max(0.0, min(1.0, float(t)))
+        a = color_a.lstrip("#")
+        b = color_b.lstrip("#")
+        channels = (
+            round(int(a[i:i + 2], 16) + (int(b[i:i + 2], 16) - int(a[i:i + 2], 16)) * t)
+            for i in (0, 2, 4)
+        )
+        return "#{:02x}{:02x}{:02x}".format(*channels)
+
     @classmethod
     def configure(cls, mode):
         cls._mode = "dark" if mode == "dark" else "light"

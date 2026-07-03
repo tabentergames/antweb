@@ -29,6 +29,7 @@ Son guncelleme: 2026-07-03
   - **F2.5 motion katmani:** `ui/motion.py` — sure/easing tokenlari, `animate`, `slide_panel`, `fade_in`, `snapshot_of`; `Motion.configure(False)` ile reduced-motion yolu.
   - **F2.5 tasarim tokenlari:** `ui/theme.py` — SPACE_XS..XL, RADIUS_SM..PILL sabitleri + light/dark `glass`, `glass_strong`, `glass_border`, `scrim` seffaf yuzey renkleri.
   - Sol/sag sidebar `slide_panel` ile animasyonlu acilip kapaniyor; genislikler `BrowserWindow.LEFT/RIGHT_SIDEBAR_WIDTH` sabitlerinde.
+  - **F2.5 tab strip animasyonlari:** `ui/tabs/tab_strip.py` — sekme ekleme buyuyerek girer (`Motion.BASE`/ENTER), kapatma daralarak cikar (`Motion.BASE`/EXIT, `tabClosed` animasyon bitiminde yayilir), hover `hoverProgress` pyqtProperty + `Theme.mix` renk gecisiyle (`Motion.FAST`). Reduced-motion'da hepsi anlik.
   - **Gorsel tutarlilik anayasasi:** `docs/DESIGN_SYSTEM.md` — token kullanimi, hareket dili, webview snapshot deseni, UI teslim kontrol listesi.
   - **Smoke test:** `scripts/smoke_test.py` — offscreen pencere kurulumu, panel toggle, tema degisimi + F4 store/workspace kontrolleri.
   - **F4 — Oturum restore:** `core/session.py` — profil+workspace bazli sekme seti kaydi (`data/sessions.json`); kapanis, tema degisimi ve workspace/profil gecislerinde kaydedilir, acilista geri yuklenir.
@@ -47,7 +48,7 @@ Son guncelleme: 2026-07-03
 - Downloads, context menu, klavye kisayollari ve error page yok (bkz. backlog "Temel tarayici yuzeyleri").
 - History'de arama/filtre, bookmark'ta etiket/klasor yok; ilk dilim bilincli olarak sade.
 - Test paketi olarak yalnizca `scripts/smoke_test.py` var; `tests/` altinda state-store ve motion testleri eklenmeli.
-- Tab strip, toolbar ve dialoglar henuz Motion/SPACE/RADIUS tokenlarini kullanmiyor (kademeli goc surecek).
+- Tab strip artik Motion tokenlarini kullaniyor; toolbar ve dialoglar ile tab strip'in SPACE/RADIUS geometri degerleri hala ciplak (kademeli goc surecek).
 - Reduced-motion icin ayarlar sayfasinda toggle yok; `Motion.configure` yalnizca kod tarafinda.
 
 ## Cikis kriteri

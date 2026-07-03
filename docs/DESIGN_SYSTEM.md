@@ -21,6 +21,7 @@ Yeni bir görsel değer gerekiyorsa sıra şudur: önce token olarak `theme.py`/
 - Tüm renkler `Theme.<token>` üzerinden gelir; her token'ın light+dark karşılığı vardır. Tek moda renk ekleme.
 - **Şeffaf tasarım dili:** içerik üstünde duran yüzeyler (overlay panel, komut paleti, floating widget, bildirim) düz `Theme.panel` yerine **`Theme.glass`** (veya daha okunur olması gerekiyorsa `Theme.glass_strong`) + `Theme.glass_border` kullanır. Modal arkası karartma: `Theme.scrim`.
 - QSS `rgba(...)` değerleri yalnızca token tanımında yaşar; bileşen kodunda rgba yazma.
+- **Animasyonlu renk geçişi:** iki token arasındaki ara renkler `Theme.mix(a, b, t)` ile üretilir (yalnızca `#rrggbb` tokenlarla). Hover gibi geçişlerde QSS `:hover` yerine bir `pyqtProperty` + `animate()` kullan (örnek: `TabButton.hoverProgress`).
 - Gerçek blur (arkadaki web içeriğini bulanıklaştırma) QtWebEngine üzerinde güvenilir değildir — cam etkisi yarı saydam renk + ince border + gölge ile verilir. Pencere-seviyesi vibrancy denemesi ayrı bir araştırma görevi olmadan yapılmaz.
 
 ## 3. Hareket dili (Motion)
