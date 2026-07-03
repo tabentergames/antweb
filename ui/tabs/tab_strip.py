@@ -176,6 +176,13 @@ class TabWidget(QWidget):
             return self._views[index]
         return None
 
+    def reset(self):
+        """Tum sekmeleri kaldirir (workspace/profil gecisleri icin)."""
+        self._tabs = []
+        self._views = []
+        self._active_index = 0
+        self._render_tabs()
+
     def updateViewReference(self, index, view):
         while len(self._views) <= index:
             self._views.append(None)

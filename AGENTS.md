@@ -52,6 +52,13 @@ Detaylar için `docs/AGENT_WORKFLOW.md` §3.
 - **F2.5 (görsel katman):** motion tokenları (`ui/motion.py`), spacing/radius/glass tokenları,
   animasyonlu sol/sağ paneller, `docs/DESIGN_SYSTEM.md`, `scripts/smoke_test.py`.
 
+## ✅ F4 Tamamlandı (2026-07-03)
+
+- Oturum kaydet/geri yükle (`core/session.py`, `data/sessions.json`).
+- Çoklu profil: izole QWebEngineProfile + storage (`data/profiles/<ad>`), settings'ten geçiş.
+- Workspace'ler: sağ panelden sekme seti geçişi/ekleme/silme.
+- History + Bookmarks: SQLite (`features/library/store.py`), `tabx://history`, `tabx://bookmarks`, toolbar ☆.
+
 **Güncel görev sırası:** `memory-bank/agent-handoff.md` + `memory-bank/feature-backlog.md`.
-Sıradaki iş: **F2.5 tab strip animasyonları** (paralel yürütülebilir: F3 ayar toggle'ları).
+Sıradaki iş: **F2.5 tab strip animasyonları** (paralel yürütülebilir: Downloads sayfası veya F3 ayar toggle'ları).
 Opera-benzeri yetenekler **F7 — Power UX** olarak backlog'da.

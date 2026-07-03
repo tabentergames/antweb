@@ -30,7 +30,13 @@ Son guncelleme: 2026-07-03
   - **F2.5 tasarim tokenlari:** `ui/theme.py` — SPACE_XS..XL, RADIUS_SM..PILL sabitleri + light/dark `glass`, `glass_strong`, `glass_border`, `scrim` seffaf yuzey renkleri.
   - Sol/sag sidebar `slide_panel` ile animasyonlu acilip kapaniyor; genislikler `BrowserWindow.LEFT/RIGHT_SIDEBAR_WIDTH` sabitlerinde.
   - **Gorsel tutarlilik anayasasi:** `docs/DESIGN_SYSTEM.md` — token kullanimi, hareket dili, webview snapshot deseni, UI teslim kontrol listesi.
-  - **Smoke test:** `scripts/smoke_test.py` — offscreen pencere kurulumu, panel toggle, tema degisimi.
+  - **Smoke test:** `scripts/smoke_test.py` — offscreen pencere kurulumu, panel toggle, tema degisimi + F4 store/workspace kontrolleri.
+  - **F4 — Oturum restore:** `core/session.py` — profil+workspace bazli sekme seti kaydi (`data/sessions.json`); kapanis, tema degisimi ve workspace/profil gecislerinde kaydedilir, acilista geri yuklenir.
+  - **F4 — Profiller:** isimli `QWebEngineProfile` + ayrik storage/cache (`data/profiles/<ad>`); `tabx://settings` uzerinden gecis ve yeni profil; F3 gizlilik katmani her profile yeniden baglanir.
+  - **F4 — Workspace:** sag panelde "Calisma Alanlari" bolumu; workspace basina sekme seti, gecis/ekle/sil.
+  - **F4 — History:** `features/library/store.py` (SQLite, `data/library-<profil>.db`); loadFinished'te kayit, `tabx://history` sayfasi + temizleme.
+  - **F4 — Bookmarks:** ayni SQLite katmani; toolbar ☆/★ toggle, `tabx://bookmarks` sayfasi + silme.
+  - **tabx:// yonlendirme:** `TabXPage.acceptNavigationRequest` ic linkleri sinyalle kabuga tasir (`_handle_internal_url`); komut linkleri: `history/clear`, `bookmarks/remove?id=`, `settings/profile?name=`, `settings/profile-new`.
 
 ## Ana teknik borc
 
@@ -38,7 +44,8 @@ Son guncelleme: 2026-07-03
 - `assets/`, `tests/` hedef klasorleri henuz kurulmus degil.
 - Fan sekme modu yok; F2 tamamlanma kriteri esnek sekme konumu ile karsilandi.
 - F3 gizlilik ozellikleri calisir durumda; ancak ayarlar sayfasinda toggle UI'i yok.
-- Profil, workspace, oturum restore, history, bookmarks ve downloads yok.
+- Downloads, context menu, klavye kisayollari ve error page yok (bkz. backlog "Temel tarayici yuzeyleri").
+- History'de arama/filtre, bookmark'ta etiket/klasor yok; ilk dilim bilincli olarak sade.
 - Test paketi olarak yalnizca `scripts/smoke_test.py` var; `tests/` altinda state-store ve motion testleri eklenmeli.
 - Tab strip, toolbar ve dialoglar henuz Motion/SPACE/RADIUS tokenlarini kullanmiyor (kademeli goc surecek).
 - Reduced-motion icin ayarlar sayfasinda toggle yok; `Motion.configure` yalnizca kod tarafinda.

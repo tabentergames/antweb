@@ -45,11 +45,11 @@ Kurallar: `docs/DESIGN_SYSTEM.md`. Motion altyapisina dokunan isler SIRALI yurut
 
 | Durum | Is | Not |
 | --- | --- | --- |
-| todo | Profil modeli | Is/kisisel/proje profilleri; ayrik storage path. |
-| todo | Workspace modeli | Workspace basina sekme listesi ve grup seti. |
-| todo | Oturum kaydet/geri yukle | Acik sekmeler, aktif sekme, panel durumu. |
-| todo | Bookmark sistemi | Etiket, klasor ve hizli arama. |
-| todo | History sayfasi | Arama, filtreleme, temizleme. |
+| done | Profil modeli | Isimli QWebEngineProfile, ayrik storage/cache (`data/profiles/<ad>`); settings sayfasindan gecis. |
+| done | Workspace modeli | Workspace basina sekme seti (`core/session.py`); sag panelden gecis/ekle/sil. |
+| done | Oturum kaydet/geri yukle | Kapanis + workspace/profil/tema gecislerinde `data/sessions.json`; acilista restore. |
+| done | Bookmark sistemi | `features/library/store.py` SQLite; toolbar ☆ toggle + `tabx://bookmarks`. Etiket/klasor sonraki dilim. |
+| done | History sayfasi | SQLite kayit (loadFinished) + `tabx://history`; temizleme linki var. Arama/filtre sonraki dilim. |
 
 ## F5 - Productivity
 
@@ -88,7 +88,7 @@ Her biri kapatilabilir modul olarak `features/` altina gider; cekirdege gomulmez
 
 | Durum | Is | Not |
 | --- | --- | --- |
-| todo | Downloads sayfasi | Indirme listesi, duraklat/devam, klasorde goster. |
+| next | Downloads sayfasi | Indirme listesi, duraklat/devam, klasorde goster. |
 | done | Settings sayfasi | `tabx://settings` ic route olarak basladi; gercek ayar kontrolleri sonraki dilim. |
 | done | About sayfasi | `tabx://about` ic route olarak basladi; surum/build bilgisi otomatik degil. |
 | todo | Error page | Ag/sertifika hata sayfalari icin TabX tasarimi. |

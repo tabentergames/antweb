@@ -7,19 +7,23 @@ premium UI shell and the F3 privacy features (ad/tracker blocking, HTTPS upgrade
 extension runtime).
 """
 
+import html as html_module
 import os
 import sys
 import json
+from datetime import datetime
 from pathlib import Path
 
 os.environ["QT_WEBENGINE_CHROMIUM_FLAGS"] = "--enable-features=NetworkService"
 
-from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
+from PyQt6.QtCore import Qt, QTimer, QUrl, QUrlQuery, pyqtSignal
+from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings, QWebEngineProfile
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 
 # F3 privacy layer
 from features.privacy.service import PrivacyService
+from features.library.store import BookmarkStore, HistoryStore
+from core.session import DEFAULT_WORKSPACE, SessionStore
 from ui.motion import Motion, slide_panel
 from ui.tabs.tab_strip import TabWidget
 from ui.theme import Theme
@@ -46,6 +50,8 @@ class UiStateStore:
     defaults = {
         "theme_mode": "light",
         "tab_position": "top",
+        "profile": "default",
+        "profiles": ["default"],
         "custom_nav_items": [],
         "tab_groups": [
             {
@@ -77,6 +83,20 @@ class UiStateStore:
                 state["theme_mode"] = loaded["theme_mode"]
             if loaded.get("tab_position") in {"top", "bottom"}:
                 state["tab_position"] = loaded["tab_position"]
+            profiles = [
+                str(p).strip()
+                for p in loaded.get("profiles", [])
+                if isinstance(p, str) and str(p).strip()
+            ]
+            if profiles:
+                state["profiles"] = profiles
+            if (
+                isinstance(loaded.get("profile"), str)
+                and loaded["profile"] in state["profiles"]
+            ):
+                state["profile"] = loaded["profile"]
+            else:
+                state["profile"] = state["profiles"][0]
             if isinstance(loaded.get("custom_nav_items"), list):
                 state["custom_nav_items"] = loaded["custom_nav_items"]
             if isinstance(loaded.get("tab_groups"), list):
@@ -84,11 +104,22 @@ class UiStateStore:
         return state
 
     @classmethod
-    def save(cls, custom_nav_items, tab_groups, theme_mode="light", tab_position="top"):
+    def save(
+        cls,
+        custom_nav_items,
+        tab_groups,
+        theme_mode="light",
+        tab_position="top",
+        profile="default",
+        profiles=None,
+    ):
         cls.state_path.parent.mkdir(parents=True, exist_ok=True)
+        profiles = [str(p) for p in (profiles or ["default"])] or ["default"]
         payload = {
             "theme_mode": "dark" if theme_mode == "dark" else "light",
             "tab_position": "bottom" if tab_position == "bottom" else "top",
+            "profile": profile if profile in profiles else profiles[0],
+            "profiles": profiles,
             "custom_nav_items": [
                 [str(icon), str(text)] for icon, text in custom_nav_items
             ],
@@ -243,11 +274,30 @@ class ConfirmDialog(QDialog):
         return cls(title, message, parent).exec() == QDialog.DialogCode.Accepted
 
 
+class TabXPage(QWebEnginePage):
+    """QWebEnginePage that routes tabx:// navigations back to the shell.
+
+    Motor tabx:// semasini yukleyemez; iç sayfa linkleri (gecmis temizle,
+    favori sil, profil degistir...) burada yakalanip sinyalle pencereye
+    iletilir, gezinme motora gitmez.
+    """
+
+    internalUrlRequested = pyqtSignal(QUrl)
+
+    def acceptNavigationRequest(self, url, nav_type, is_main_frame):  # noqa: N802
+        if url.scheme() == "tabx":
+            self.internalUrlRequested.emit(url)
+            return False
+        return super().acceptNavigationRequest(url, nav_type, is_main_frame)
+
+
 class BrowserTab(QWebEngineView):
     """Single browser tab."""
 
-    def __init__(self, parent=None):
+    def __init__(self, profile=None, parent=None):
         super().__init__(parent)
+        page = TabXPage(profile, self) if profile is not None else TabXPage(self)
+        self.setPage(page)
         self._configure_memory_profile()
 
     def _configure_memory_profile(self):
@@ -275,19 +325,74 @@ class BrowserWindow(QMainWindow):
         self.current_view = None
         self.left_sidebar_open = False
         self.right_sidebar_open = False
+        self._retired_profiles = []
         self._load_ui_state()
         Theme.configure(self.theme_mode)
-        self._setup_privacy_layer()
+        self._setup_web_profile()
 
         app = QApplication.instance()
         if app:
             app.setStyleSheet(Theme.qss)
 
         self.setCentralWidget(self._build_main_shell())
-        self.add_new_tab(QUrl("tabx://newtab"), "Yeni Sekme")
+        self._restore_session()
 
-    def _setup_privacy_layer(self):
-        self.privacy = PrivacyService(QWebEngineProfile.defaultProfile())
+    def _setup_web_profile(self):
+        """Aktif profil icin izole QWebEngineProfile + F3 gizlilik + F4 store'lar."""
+        data_dir = Path(__file__).resolve().parent.parent / "data" / "profiles" / self.profile_name
+        (data_dir / "storage").mkdir(parents=True, exist_ok=True)
+        (data_dir / "cache").mkdir(parents=True, exist_ok=True)
+
+        profile = QWebEngineProfile(f"tabx-{self.profile_name}", self)
+        profile.setPersistentStoragePath(str(data_dir / "storage"))
+        profile.setCachePath(str(data_dir / "cache"))
+        self.web_profile = profile
+        self.privacy = PrivacyService(profile)
+        self.history = HistoryStore(self.profile_name)
+        self.bookmarks = BookmarkStore(self.profile_name)
+        self.workspace = SessionStore.active_workspace(self.profile_name)
+
+    def _restore_session(self):
+        """Aktif profil + workspace icin kayitli sekmeleri geri yukler."""
+        tabs, active_index = SessionStore.load_tabs(self.profile_name, self.workspace)
+        if not tabs:
+            self.add_new_tab(QUrl("tabx://newtab"), "Yeni Sekme")
+            return
+        for tab in tabs:
+            self.add_new_tab(QUrl(tab["url"]), tab["title"] or "Yeni Sekme")
+        self.tabs.setCurrentIndex(min(active_index, self.tabs.count() - 1))
+
+    def _collect_session_tabs(self):
+        tabs = []
+        for view in self.tabs._views:
+            if not view:
+                continue
+            url = view.url().toString()
+            if not url or url == "about:blank":
+                url = "tabx://newtab"
+            tabs.append({"url": url, "title": view.title().strip()})
+        return tabs
+
+    def _save_session(self):
+        SessionStore.save_tabs(
+            self.profile_name,
+            self.workspace,
+            self._collect_session_tabs(),
+            self.tabs.currentIndex(),
+        )
+
+    def closeEvent(self, event):  # noqa: N802
+        self._save_session()
+        # Sayfalar profilden once yok edilmeli; deleteLater kapanista islenmez.
+        from PyQt6 import sip
+
+        self.current_view = None
+        for view in list(self.tabs._views):
+            if view:
+                self.web_container.removeWidget(view)
+                sip.delete(view)
+        self.tabs.reset()
+        super().closeEvent(event)
 
     def _build_main_shell(self):
         central = QWidget()
@@ -312,6 +417,8 @@ class BrowserWindow(QMainWindow):
         state = UiStateStore.load()
         self.theme_mode = state.get("theme_mode", "light")
         self.tab_position = state.get("tab_position", "top")
+        self.profiles = state.get("profiles", ["default"])
+        self.profile_name = state.get("profile", self.profiles[0])
         self.custom_nav_items = [
             (str(icon), str(text))
             for icon, text in state.get("custom_nav_items", [])
@@ -343,6 +450,8 @@ class BrowserWindow(QMainWindow):
             self.tab_groups,
             self.theme_mode,
             self.tab_position,
+            self.profile_name,
+            self.profiles,
         )
 
     def _create_left_rail(self):
@@ -529,10 +638,13 @@ class BrowserWindow(QMainWindow):
         self.address_bar.returnPressed.connect(self.navigate_to_url)
         layout.addWidget(self.address_bar, 1)
 
+        self.bookmark_btn = self._icon_button("☆", "Favorilere ekle")
+        self.bookmark_btn.clicked.connect(lambda checked=False: self.toggle_bookmark())
+        layout.addWidget(self.bookmark_btn)
+
         page_actions = [
-            ("☆", "Favori", None),
-            ("◈", "Güvenlik", None),
-            ("◉", "Profil", None),
+            ("◷", "Geçmiş", lambda: self.open_internal_page("history")),
+            ("◉", "Profil", lambda: self.open_internal_page("settings")),
             ("◐", "Açık/koyu tema", self.toggle_theme_mode),
             ("⇅", "Sekmeleri üste/alta al", self.toggle_tab_position),
             ("⚙", "Ayarlar", lambda: self.open_internal_page("settings")),
@@ -629,8 +741,8 @@ class BrowserWindow(QMainWindow):
             layout,
             "HESAP",
             [
-                ("☆", "Favoriler", False),
-                ("◷", "Geçmiş", False),
+                ("☆", "Favoriler", False, lambda: self.open_internal_page("bookmarks")),
+                ("◷", "Geçmiş", False, lambda: self.open_internal_page("history")),
                 ("⚙", "Ayarlar", False, lambda: self.open_internal_page("settings")),
             ],
         )
@@ -694,6 +806,27 @@ class BrowserWindow(QMainWindow):
         layout.setContentsMargins(16, 18, 16, 18)
         layout.setSpacing(12)
 
+        ws_header = QHBoxLayout()
+        ws_title = QLabel("Çalışma Alanları")
+        ws_title.setStyleSheet(f"font-size: 14px; font-weight: 800; color: {Theme.text};")
+        ws_header.addWidget(ws_title)
+        ws_header.addStretch(1)
+        ws_add = self._icon_button("+", "Çalışma alanı ekle")
+        ws_add.setFixedSize(30, 30)
+        ws_add.clicked.connect(lambda checked=False: self.add_workspace())
+        ws_header.addWidget(ws_add)
+        close = self._icon_button("×", "Sağ paneli kapat")
+        close.setFixedSize(30, 30)
+        close.clicked.connect(lambda checked=False: self.toggle_right_sidebar(False))
+        ws_header.addWidget(close)
+        layout.addLayout(ws_header)
+
+        self.workspace_layout = QVBoxLayout()
+        self.workspace_layout.setContentsMargins(0, 0, 0, 0)
+        self.workspace_layout.setSpacing(6)
+        layout.addLayout(self.workspace_layout)
+        self._render_workspaces()
+
         header = QHBoxLayout()
         title = QLabel("Sekme Grupları")
         title.setStyleSheet(f"font-size: 14px; font-weight: 800; color: {Theme.text};")
@@ -703,10 +836,6 @@ class BrowserWindow(QMainWindow):
         add.setFixedSize(30, 30)
         add.clicked.connect(self.add_tab_group)
         header.addWidget(add)
-        close = self._icon_button("×", "Sağ paneli kapat")
-        close.setFixedSize(30, 30)
-        close.clicked.connect(lambda checked=False: self.toggle_right_sidebar(False))
-        header.addWidget(close)
         layout.addLayout(header)
 
         self.tab_groups_layout = QVBoxLayout()
@@ -750,12 +879,127 @@ class BrowserWindow(QMainWindow):
         self._save_ui_state()
         self._place_center_widgets()
 
+    # ------------------------------------------------------------------
+    # F4 — profil ve workspace
+    # ------------------------------------------------------------------
+
+    def add_profile(self):
+        name, ok = TextInputDialog.get_text(self, "Yeni profil", "Profil adı")
+        if not ok or not name:
+            return
+        name = name.strip()
+        if name not in self.profiles:
+            self.profiles.append(name)
+            self._save_ui_state()
+        self.switch_profile(name)
+
+    def switch_profile(self, name):
+        """Mevcut oturumu kaydeder, hedef profilin oturumunu izole storage ile acar."""
+        name = name.strip()
+        if not name or name == self.profile_name:
+            return
+        self._save_session()
+        self.history.close()
+        self.bookmarks.close()
+        # Eski profil nesnesi acik sayfalar yok edilene kadar yasamali.
+        self._retired_profiles.append(self.web_profile)
+
+        if name not in self.profiles:
+            self.profiles.append(name)
+        self.profile_name = name
+        self._save_ui_state()
+        self._setup_web_profile()
+        self._reset_tabs()
+        self._restore_session()
+        self._render_workspaces()
+
+    def add_workspace(self):
+        name, ok = TextInputDialog.get_text(self, "Yeni çalışma alanı", "Alan adı")
+        if not ok or not name:
+            return
+        SessionStore.add_workspace(self.profile_name, name.strip())
+        self.switch_workspace(name.strip())
+
+    def switch_workspace(self, name):
+        """Aktif sekme setini kaydedip hedef workspace'in setini yukler."""
+        if name == self.workspace:
+            return
+        self._save_session()
+        self.workspace = name
+        SessionStore.set_active_workspace(self.profile_name, name)
+        self._reset_tabs()
+        self._restore_session()
+        self._render_workspaces()
+
+    def remove_workspace(self, name):
+        if name == DEFAULT_WORKSPACE:
+            return
+        confirmed = ConfirmDialog.ask(
+            self, "Alanı sil", f"'{name}' çalışma alanını silmek istiyor musun?"
+        )
+        if not confirmed:
+            return
+        SessionStore.remove_workspace(self.profile_name, name)
+        if self.workspace == name:
+            self.workspace = DEFAULT_WORKSPACE
+            self._reset_tabs()
+            self._restore_session()
+        self._render_workspaces()
+
+    def _reset_tabs(self):
+        """Tum acik sekmeleri ve view'leri kaldirir (workspace/profil gecisi)."""
+        for view in list(self.tabs._views):
+            if view:
+                self.web_container.removeWidget(view)
+                view.deleteLater()
+        self.current_view = None
+        self.tabs.reset()
+
+    def _render_workspaces(self):
+        if not hasattr(self, "workspace_layout"):
+            return
+        self._clear_layout(self.workspace_layout)
+        for name in SessionStore.workspaces(self.profile_name):
+            row = QHBoxLayout()
+            pill = QPushButton(name)
+            pill.setFixedHeight(30)
+            pill.setCursor(Qt.CursorShape.PointingHandCursor)
+            active = name == self.workspace
+            bg = Theme.purple_soft if active else Theme.panel_alt
+            color = Theme.purple if active else Theme.muted
+            pill.setStyleSheet(
+                f"""
+                QPushButton {{
+                    border: 1px solid {Theme.border_soft};
+                    border-radius: {Theme.RADIUS_SM}px;
+                    background-color: {bg};
+                    color: {color};
+                    font-size: 12px;
+                    font-weight: 750;
+                    text-align: left;
+                    padding-left: 10px;
+                }}
+                QPushButton:hover {{
+                    background-color: {Theme.purple_soft};
+                    color: {Theme.purple};
+                }}
+                """
+            )
+            pill.clicked.connect(
+                lambda checked=False, ws=name: self.switch_workspace(ws)
+            )
+            row.addWidget(pill, 1)
+            if name != DEFAULT_WORKSPACE:
+                remove = self._mini_button("×", "Alanı sil")
+                remove.clicked.connect(
+                    lambda checked=False, ws=name: self.remove_workspace(ws)
+                )
+                row.addWidget(remove)
+            self.workspace_layout.addLayout(row)
+
     def _rebuild_visual_shell(self):
-        current_url = QUrl("tabx://newtab")
-        current_title = "Yeni Sekme"
-        if self.current_view:
-            current_url = self.current_view.url()
-            current_title = self.current_view.title().strip() or current_title
+        # Acik sekmeler kaybolmasin: oturumu kaydet, kabugu kur, geri yukle.
+        self._save_session()
 
         Theme.configure(self.theme_mode)
         app = QApplication.instance()
@@ -767,7 +1011,7 @@ class BrowserWindow(QMainWindow):
         self.setCentralWidget(self._build_main_shell())
         if old_central:
             old_central.deleteLater()
-        self.add_new_tab(current_url, current_title)
+        self._restore_session()
 
     def add_custom_shortcut(self):
         name, ok = TextInputDialog.get_text(self, "Kısayol ekle", "Kısayol adı")
@@ -1065,12 +1309,18 @@ class BrowserWindow(QMainWindow):
         if internal_page:
             title = self._internal_page_title(internal_page)
 
-        new_view = BrowserTab(self)
+        new_view = BrowserTab(self.web_profile, self)
         new_view.urlChanged.connect(
             lambda changed_url, view=new_view: self._handle_url_changed(view, changed_url)
         )
         new_view.titleChanged.connect(
             lambda text, view=new_view: self._handle_title_changed(view, text)
+        )
+        new_view.loadFinished.connect(
+            lambda ok, view=new_view: self._record_history(ok, view)
+        )
+        new_view.page().internalUrlRequested.connect(
+            lambda internal_url, view=new_view: self._handle_internal_url(view, internal_url)
         )
         self.privacy.attach_tab(new_view)
 
@@ -1125,12 +1375,15 @@ class BrowserWindow(QMainWindow):
             self.current_view.setUrl(url)
 
     def update_address_bar(self, url):
+        self._update_bookmark_button(url)
         if self._is_new_tab_url(url):
             self.address_bar.clear()
             return
         self.address_bar.setText(url.toString())
 
     def _handle_url_changed(self, view, url):
+        if url.scheme() in {"http", "https"}:
+            view._internal_key = None
         if view is self.current_view:
             self.update_address_bar(url)
 
@@ -1165,8 +1418,11 @@ class BrowserWindow(QMainWindow):
             return
         self._load_internal_page(self.current_view, page_key)
 
+    INTERNAL_PAGES = {"newtab", "settings", "about", "history", "bookmarks"}
+
     def _load_internal_page(self, view, page_key):
-        page_key = page_key if page_key in {"newtab", "settings", "about"} else "newtab"
+        page_key = page_key if page_key in self.INTERNAL_PAGES else "newtab"
+        view._internal_key = page_key
         view.setHtml(self._internal_page_html(page_key), QUrl(f"tabx://{page_key}"))
         self.update_address_bar(QUrl(f"tabx://{page_key}"))
         try:
@@ -1179,7 +1435,7 @@ class BrowserWindow(QMainWindow):
         if url.scheme() != "tabx":
             return None
         key = url.host() or url.path().strip("/")
-        if key in {"newtab", "settings", "about"}:
+        if key in self.INTERNAL_PAGES:
             return key
         return "newtab"
 
@@ -1188,6 +1444,8 @@ class BrowserWindow(QMainWindow):
             "newtab": "Yeni Sekme",
             "settings": "Ayarlar",
             "about": "Hakkında",
+            "history": "Geçmiş",
+            "bookmarks": "Favoriler",
         }.get(page_key, "Yeni Sekme")
 
     def _internal_page_html(self, page_key):
@@ -1195,7 +1453,72 @@ class BrowserWindow(QMainWindow):
             return self._settings_page_html()
         if page_key == "about":
             return self._about_page_html()
+        if page_key == "history":
+            return self._history_page_html()
+        if page_key == "bookmarks":
+            return self._bookmarks_page_html()
         return self._new_tab_html()
+
+    def _handle_internal_url(self, view, url):
+        """tabx:// linklerini komut veya sayfa olarak isler (TabXPage sinyali)."""
+        key = self._internal_page_key(url)
+        action = url.path().strip("/")
+        query = QUrlQuery(url)
+
+        # setHtml'in kendi baseUrl'i icin urettigi navigasyon sinyalini yut;
+        # aksi halde ayni sayfa sonsuz dongude yeniden yuklenir.
+        if not action and key == getattr(view, "_internal_key", None):
+            return
+
+        if key == "history" and action == "clear":
+            self.history.clear()
+            self._load_internal_page(view, "history")
+            return
+        if key == "bookmarks" and action == "remove":
+            entry_id = query.queryItemValue("id")
+            if entry_id.isdigit():
+                self.bookmarks.remove_by_id(int(entry_id))
+            self._load_internal_page(view, "bookmarks")
+            return
+        if key == "settings" and action == "profile":
+            name = query.queryItemValue("name").strip()
+            if name:
+                # Sayfa kendi navigasyon callback'i icindeyken yikilamaz;
+                # gecisi bir sonraki event loop turuna ertele.
+                QTimer.singleShot(0, lambda: self.switch_profile(name))
+            return
+        if key == "settings" and action == "profile-new":
+            QTimer.singleShot(0, self.add_profile)
+            return
+        self._load_internal_page(view, key)
+
+    def _record_history(self, ok, view):
+        if not ok:
+            return
+        url = view.url()
+        if url.scheme() not in {"http", "https"}:
+            return
+        self.history.record(url.toString(), view.title().strip())
+
+    def toggle_bookmark(self):
+        if not self.current_view:
+            return
+        url = self.current_view.url()
+        if url.scheme() not in {"http", "https"}:
+            return
+        self.bookmarks.toggle(url.toString(), self.current_view.title().strip())
+        self._update_bookmark_button(url)
+
+    def _update_bookmark_button(self, url):
+        if not hasattr(self, "bookmark_btn"):
+            return
+        bookmarked = url.scheme() in {"http", "https"} and self.bookmarks.contains(
+            url.toString()
+        )
+        self.bookmark_btn.setText("★" if bookmarked else "☆")
+        self.bookmark_btn.setToolTip(
+            "Favorilerden çıkar" if bookmarked else "Favorilere ekle"
+        )
 
     def _is_new_tab_url(self, url):
         return self._internal_page_key(url) == "newtab" or url.toString() in {
@@ -1321,6 +1644,21 @@ class BrowserWindow(QMainWindow):
         tab_position_label = (
             "Sekmeler altta" if self.tab_position == "bottom" else "Sekmeler üstte"
         )
+        profile_pills = []
+        for name in self.profiles:
+            safe = html_module.escape(name, quote=True)
+            if name == self.profile_name:
+                profile_pills.append(f'<span class="pill status">{safe} ✓</span>')
+            else:
+                profile_pills.append(
+                    f'<a class="pill" style="text-decoration:none;" '
+                    f'href="tabx://settings/profile?name={safe}">{safe}</a>'
+                )
+        profile_pills.append(
+            '<a class="pill" style="text-decoration:none;" '
+            'href="tabx://settings/profile-new">+ Yeni profil</a>'
+        )
+        profiles_html = "".join(profile_pills)
         return f"""
         <!doctype html>
         <html lang="tr">
@@ -1351,6 +1689,15 @@ class BrowserWindow(QMainWindow):
                   <span class="pill status">{tab_position_label}</span>
                   <span class="pill">Toolbar ⇅</span>
                 </div>
+              </article>
+              <article class="card">
+                <h2>Profiller</h2>
+                <p>Her profil ayrık çerez/önbellek/geçmiş/favori deposu kullanır. Bir profile tıklayınca oturum kaydedilir ve o profile geçilir.</p>
+                <div class="pill-row">{profiles_html}</div>
+              </article>
+              <article class="card">
+                <h2>Çalışma Alanları</h2>
+                <p>Sekme setleri workspace bazında kaydedilir; sağ paneldeki "Çalışma Alanları" bölümünden geçiş yapılır. Aktif alan: <b>{html_module.escape(self.workspace)}</b></p>
               </article>
               <article class="card">
                 <h2>Gizlilik</h2>
@@ -1408,6 +1755,136 @@ class BrowserWindow(QMainWindow):
                 <p>Önce firma içi pilot için çalışan, hızlı ve gösterilebilir küçük parçalar.</p>
               </article>
             </section>
+          </main>
+        </body>
+        </html>
+        """
+
+    def _list_page_row_css(self):
+        return """
+            .rows { display: flex; flex-direction: column; gap: 8px; }
+            .row {
+              display: flex;
+              align-items: center;
+              gap: 14px;
+              border: 1px solid var(--line);
+              border-radius: 14px;
+              background: var(--card);
+              padding: 12px 16px;
+            }
+            .row a.link {
+              flex: 1;
+              min-width: 0;
+              color: var(--text);
+              text-decoration: none;
+              font-size: 13px;
+              font-weight: 700;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+            .row a.link:hover { color: var(--purple); }
+            .row .url {
+              max-width: 40%;
+              color: var(--muted);
+              font-size: 12px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+            .row .time { color: var(--muted); font-size: 12px; white-space: nowrap; }
+            .row a.action {
+              color: var(--muted);
+              text-decoration: none;
+              font-size: 12px;
+              font-weight: 800;
+              border: 1px solid var(--line);
+              border-radius: 8px;
+              padding: 4px 8px;
+            }
+            .row a.action:hover { color: #c0392b; border-color: #c0392b; }
+            .toolbar-row { display: flex; justify-content: flex-end; margin: 0 0 14px; }
+            .toolbar-row a {
+              color: var(--muted);
+              text-decoration: none;
+              font-size: 12px;
+              font-weight: 800;
+              border: 1px solid var(--line);
+              border-radius: 999px;
+              padding: 8px 14px;
+            }
+            .toolbar-row a:hover { color: #c0392b; border-color: #c0392b; }
+            .empty { color: var(--muted); font-size: 14px; padding: 24px 4px; }
+        """
+
+    def _history_page_html(self):
+        rows = []
+        for entry_id, url, title, visited_at in self.history.recent(200):
+            safe_url = html_module.escape(url, quote=True)
+            safe_title = html_module.escape(title or url)
+            stamp = datetime.fromtimestamp(visited_at).strftime("%d.%m.%Y %H:%M")
+            rows.append(
+                f'<div class="row"><a class="link" href="{safe_url}">{safe_title}</a>'
+                f'<span class="url">{safe_url}</span>'
+                f'<span class="time">{stamp}</span></div>'
+            )
+        body = "\n".join(rows) if rows else '<p class="empty">Henüz gezinme geçmişi yok.</p>'
+        clear_row = (
+            '<div class="toolbar-row"><a href="tabx://history/clear">Geçmişi temizle</a></div>'
+            if rows
+            else ""
+        )
+        return f"""
+        <!doctype html>
+        <html lang="tr">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Geçmiş</title>
+          <style>{self._internal_page_base_css()}{self._list_page_row_css()}</style>
+        </head>
+        <body>
+          <main>
+            <p class="eyebrow">TabX İç Sayfa</p>
+            <h1>Geçmiş</h1>
+            <p class="subtitle">'{html_module.escape(self.profile_name)}' profilinin son 200 ziyareti.</p>
+            {clear_row}
+            <section class="rows">{body}</section>
+          </main>
+        </body>
+        </html>
+        """
+
+    def _bookmarks_page_html(self):
+        rows = []
+        for entry_id, url, title, _created_at in self.bookmarks.all():
+            safe_url = html_module.escape(url, quote=True)
+            safe_title = html_module.escape(title or url)
+            rows.append(
+                f'<div class="row"><a class="link" href="{safe_url}">{safe_title}</a>'
+                f'<span class="url">{safe_url}</span>'
+                f'<a class="action" href="tabx://bookmarks/remove?id={entry_id}">Sil</a></div>'
+            )
+        body = (
+            "\n".join(rows)
+            if rows
+            else '<p class="empty">Henüz favori yok. Toolbar\'daki ☆ ile ekleyebilirsin.</p>'
+        )
+        return f"""
+        <!doctype html>
+        <html lang="tr">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Favoriler</title>
+          <style>{self._internal_page_base_css()}{self._list_page_row_css()}</style>
+        </head>
+        <body>
+          <main>
+            <p class="eyebrow">TabX İç Sayfa</p>
+            <h1>Favoriler</h1>
+            <p class="subtitle">'{html_module.escape(self.profile_name)}' profilinin kayıtlı favorileri.</p>
+            <section class="rows">{body}</section>
           </main>
         </body>
         </html>

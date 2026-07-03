@@ -43,6 +43,27 @@ def run() -> int:
     window.toggle_theme_mode()
     window.toggle_theme_mode()
 
+    # F4 — history/bookmark store'lari
+    window.history.record("https://example.com", "Example")
+    assert window.history.recent(), "history kaydi yazilmadi"
+    assert window.bookmarks.toggle("https://example.com", "Example"), "bookmark eklenemedi"
+    assert window.bookmarks.contains("https://example.com"), "bookmark bulunamadi"
+    assert not window.bookmarks.toggle("https://example.com"), "bookmark toggle silmedi"
+
+    # F4 — ic sayfalar HTML uretimi
+    for key in ("history", "bookmarks", "settings"):
+        assert "<h1>" in window._internal_page_html(key), f"{key} sayfasi bos"
+
+    # F4 — workspace gecisi
+    from core.session import SessionStore
+
+    SessionStore.add_workspace(window.profile_name, "SmokeWS")
+    window.switch_workspace("SmokeWS")
+    assert window.workspace == "SmokeWS", "workspace gecisi olmadi"
+    assert window.tabs.count() >= 1, "workspace gecisinde sekme kalmadi"
+    window.switch_workspace("Genel")
+    SessionStore.remove_workspace(window.profile_name, "SmokeWS")
+
     QTimer.singleShot(500, app.quit)
     app.exec()
     print("SMOKE TEST PASS")
