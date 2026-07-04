@@ -25,6 +25,7 @@ from features.privacy.service import PrivacyService
 from features.library.store import BookmarkStore, HistoryStore
 from core.session import DEFAULT_WORKSPACE, SessionStore
 from ui.motion import Motion, animate, slide_panel, snapshot_of
+from ui.tabs.fan_overlay import FanOverlay
 from ui.tabs.tab_strip import TabWidget
 from ui.theme import Theme
 from PyQt6.QtWidgets import (
@@ -325,6 +326,8 @@ class BrowserWindow(QMainWindow):
         self.resize(1440, 900)
         self.current_view = None
         self._switch_ghost = None
+        self._fan_overlay = None
+        self._tab_snapshots = {}
         self.left_sidebar_open = False
         self.right_sidebar_open = False
         self._retired_profiles = []
@@ -651,6 +654,7 @@ class BrowserWindow(QMainWindow):
         # Sayfa islemleri: sik kullanilanlar ikon olarak kalir, gerisi
         # "⋯" menusune iner — toolbar kalabaligini azaltir.
         page_actions = [
+            ("❖", "Sekme yelpazesi", self.toggle_fan_mode),
             ("◷", "Geçmiş", lambda: self.open_internal_page("history")),
             ("◐", "Açık/koyu tema", self.toggle_theme_mode),
         ]
@@ -966,6 +970,44 @@ class BrowserWindow(QMainWindow):
         slide_panel(self.right_sidebar, self.right_sidebar_open, self.RIGHT_SIDEBAR_WIDTH)
         self._set_rail_button_active(self.right_toggle_btn, self.right_sidebar_open)
 
+    def toggle_fan_mode(self):
+        """Fan sekme modu: tum sekmelerin snapshot kartlarini overlay'de acar."""
+        if self._fan_overlay is not None:
+            self._fan_overlay.dismiss()
+            return
+        if self.tabs.count() == 0:
+            return
+        entries = []
+        for index in range(self.tabs.count()):
+            title = self.tabs._tabs[index]["title"]
+            entries.append((index, title, self._tab_pixmap(index)))
+        overlay = FanOverlay(
+            self.centralWidget(), entries, active_index=self.tabs.currentIndex()
+        )
+        overlay.tabSelected.connect(self.tabs.setCurrentIndex)
+        overlay.dismissed.connect(self._clear_fan_overlay)
+        self._fan_overlay = overlay
+
+    def _clear_fan_overlay(self):
+        self._fan_overlay = None
+
+    def _tab_pixmap(self, index):
+        """Fan karti icin sekme goruntusu: aktif view canli, digerleri cache'ten.
+
+        Arka plandaki QWebEngineView'lerin grab'i guvenilir degildir; onlar
+        icin son sekme gecisinde saklanan kare kullanilir (yoksa None —
+        kart bos zemin gosterir).
+        """
+        view = self.tabs.widget(index)
+        if view is None:
+            return None
+        if view is self.web_container.currentWidget():
+            pixmap = view.grab()
+            if not pixmap.isNull():
+                self._tab_snapshots[view] = pixmap
+                return pixmap
+        return self._tab_snapshots.get(view)
+
     def toggle_theme_mode(self):
         self.theme_mode = "dark" if self.theme_mode == "light" else "light"
         self._save_ui_state()
@@ -1046,6 +1088,9 @@ class BrowserWindow(QMainWindow):
 
     def _reset_tabs(self):
         """Tum acik sekmeleri ve view'leri kaldirir (workspace/profil gecisi)."""
+        if self._fan_overlay is not None:
+            self._fan_overlay.dismiss()
+        self._tab_snapshots.clear()
         for view in list(self.tabs._views):
             if view:
                 self.web_container.removeWidget(view)
@@ -1097,6 +1142,8 @@ class BrowserWindow(QMainWindow):
 
     def _rebuild_visual_shell(self):
         # Acik sekmeler kaybolmasin: oturumu kaydet, kabugu kur, geri yukle.
+        if self._fan_overlay is not None:
+            self._fan_overlay.dismiss()
         self._save_session()
 
         Theme.configure(self.theme_mode)
@@ -1451,6 +1498,7 @@ class BrowserWindow(QMainWindow):
                     and view is self.web_container.currentWidget()
                 ):
                     ghost = snapshot_of(view)
+                self._tab_snapshots.pop(view, None)
                 self.web_container.removeWidget(view)
                 view.deleteLater()
 
@@ -1496,6 +1544,11 @@ class BrowserWindow(QMainWindow):
             return
         if ghost is None:
             ghost = snapshot_of(old_view)
+        # Fan modu icin son gorunum cache'i: arka plandaki webview'ler
+        # guvenilir grab edilemez, gecis aninda alinan kare saklanir.
+        pixmap = ghost.pixmap()
+        if old_view is not None and not pixmap.isNull():
+            self._tab_snapshots[old_view] = pixmap
 
         if self._switch_ghost is not None:
             self._switch_ghost.deleteLater()

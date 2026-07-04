@@ -86,6 +86,20 @@ def run() -> int:
     window.close_tab(window.tabs.count() - 1)
     assert window.tabs.count() == before, "gecis testi sekmesi kapanmadi"
 
+    # F2.5 — fan sekme modu: reduced-motion'da acilir, secim aktive eder, kapanir.
+    window.add_new_tab()
+    window.toggle_fan_mode()
+    assert window._fan_overlay is not None, "fan overlay acilmadi"
+    assert len(window._fan_overlay._cards) == window.tabs.count(), "fan kart sayisi yanlis"
+    window._fan_overlay._select(0)
+    assert window._fan_overlay is None, "fan secimi overlay'i kapatmadi"
+    assert window.tabs.currentIndex() == 0, "fan secimi sekmeyi aktive etmedi"
+    window.toggle_fan_mode()
+    window.toggle_fan_mode()  # acikken tekrar cagirmak kapatir
+    assert window._fan_overlay is None, "fan toggle kapatmadi"
+    window.close_tab(window.tabs.count() - 1)
+    assert window.tabs.count() == before, "fan testi sekmesi kapanmadi"
+
     # Ayni akis animasyonlar acikken — bagimsiz TabWidget uzerinde
     # (webview olusturmadan). Kapatma tabClosed'u animasyon bitiminde
     # yayar; dogrulama processEvents ile pump'lanmaz (offscreen'de

@@ -4,6 +4,16 @@ Son guncelleme: 2026-07-04
 
 ## Son kararlar
 
+- **F2.5 fan sekme modu tamamlandi (2026-07-04):** `ui/tabs/fan_overlay.py` —
+  animasyon zincirinin son halkasi (tab strip -> snapshot gecisi -> fan modu).
+  Kritik desenler: (1) arka plandaki QWebEngineView'ler guvenilir grab
+  edilemez; kart goruntuleri sekme gecisinde dolan `_tab_snapshots`
+  cache'inden gelir, yalnizca aktif view canli grab edilir; (2) overlay
+  merkez kabuga (centralWidget) parent'lanir ve `_rebuild_visual_shell` /
+  `_reset_tabs` basinda `dismiss()` edilir — tema/profil/workspace gecisi
+  overlay acikken patlamaz; (3) scrim tiklama ayrimi `childAt` ile yapilir.
+  Ayni cache/overlay desenleri split view ve workspace gecis animasyonunda
+  yeniden kullanilabilir.
 - **F2.5 snapshot sekme gecisi tamamlandi (2026-07-04):**
   `BrowserWindow._switch_view_with_transition` — eski view'in `snapshot_of`
   ghost'u yeni view ustunde `Motion.SLOW`/EXIT ile yana kayar (yon = indeks
@@ -46,23 +56,27 @@ Son guncelleme: 2026-07-04
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-Faz: F2.5 | Modul: `ui/tabs` + `core/browser_window.py` | Kapsam: fan sekme modu.
-(Snapshot gecisi bitti; animasyon sirasi geregi siradaki is bu.)
+Faz: F2.5 | Modul: `core/browser_window.py` (settings sayfasi) + `ui/motion.py` |
+Kapsam: reduced-motion ayari.
+(Animasyon zinciri bitti; motion katmanini kullaniciya acan son dilim bu.)
 
 Neden:
 
-- Animasyon gorevleri SIRALI: tab strip -> snapshot gecisi -> fan modu (son halka).
-- Snapshot deseni `_switch_view_with_transition` icinde kanitlandi; fan modu
-  ayni ghost yaklasimiyla kurulur (her sekme icin snapshot karti).
+- `Motion.configure` yalnizca kod tarafinda; erisilebilirlik icin kullanici
+  toggle'i gerekiyor. Kucuk, net sinirli bir dilim.
+- Ic sayfa komut linki deseni hazir (`tabx://settings/profile?name=` ornekleri).
 
 Net teslim kriteri:
 
-- Fan modu bir overlay yuzeyidir: sekme snapshot'lari kart olarak yayilir,
-  karta tiklama o sekmeyi aktive eder, ESC/disari tiklama kapatir.
-- Overlay `Theme.glass_strong` + `Theme.scrim` kullanir; kartlar `Motion.SLOW` ile girer.
-- Webview'e efekt UYGULANMAZ; yalnizca snapshot QLabel'lari anime edilir.
-- `Motion.configure(False)` iken fan anlik acilir/kapanir.
-- `python3 main.py` + `python3 scripts/smoke_test.py` geciyor; light+dark modda gozle bakildi.
+- `tabx://settings` icinde "Animasyonlari azalt" toggle'i; `tabx://settings/...`
+  komut linki deseniyle calisir.
+- Tercih `data/ui_state.json`'a yazilir; acilista `Motion.configure` ile uygulanir.
+- Toggle acikken tum animasyonlar (panel, tab strip, snapshot gecisi, fan) anlik.
+- `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
+
+Paralel yurutulebilir ikinci gorev (farkli yuzeyler): glass yuzey gecisi —
+sol/sag sidebar ve dialog yuzeylerini `Theme.glass*` tokenlarina tasi
+(DESIGN_SYSTEM §2).
 
 Paralel yurutulebilir ikinci gorev (farkli dosyalar):
 
