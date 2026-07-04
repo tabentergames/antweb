@@ -16,7 +16,7 @@ from pathlib import Path
 
 os.environ["QT_WEBENGINE_CHROMIUM_FLAGS"] = "--enable-features=NetworkService"
 
-from PyQt6.QtCore import Qt, QTimer, QUrl, QUrlQuery, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt, QTimer, QUrl, QUrlQuery, pyqtSignal
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings, QWebEngineProfile
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 
@@ -24,7 +24,7 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from features.privacy.service import PrivacyService
 from features.library.store import BookmarkStore, HistoryStore
 from core.session import DEFAULT_WORKSPACE, SessionStore
-from ui.motion import Motion, slide_panel
+from ui.motion import Motion, animate, slide_panel, snapshot_of
 from ui.tabs.tab_strip import TabWidget
 from ui.theme import Theme
 from PyQt6.QtWidgets import (
@@ -324,6 +324,7 @@ class BrowserWindow(QMainWindow):
         self.setMinimumSize(1180, 760)
         self.resize(1440, 900)
         self.current_view = None
+        self._switch_ghost = None
         self.left_sidebar_open = False
         self.right_sidebar_open = False
         self._retired_profiles = []
@@ -1439,9 +1440,17 @@ class BrowserWindow(QMainWindow):
     def close_tab(self, index):
         if self.tabs.count() <= 1:
             return
+        ghost = None
         if index < len(self.tabs._views):
             view = self.tabs._views[index]
             if view:
+                # Snapshot removeWidget'tan ONCE alinmali; sonrasi bos pixmap.
+                if (
+                    Motion.enabled
+                    and self.isVisible()
+                    and view is self.web_container.currentWidget()
+                ):
+                    ghost = snapshot_of(view)
                 self.web_container.removeWidget(view)
                 view.deleteLater()
 
@@ -1449,15 +1458,64 @@ class BrowserWindow(QMainWindow):
         new_index = min(index, max(0, self.tabs.count() - 1))
         if new_index < len(self.tabs._views):
             self.current_view = self.tabs._views[new_index]
-            self.web_container.setCurrentWidget(self.current_view)
+            self._switch_view_with_transition(self.current_view, direction=-1, ghost=ghost)
             self.update_address_bar(self.current_view.url())
+        elif ghost is not None:
+            ghost.deleteLater()
 
     def handle_tab_activated(self, index):
         if hasattr(self.tabs, "_views") and index < len(self.tabs._views):
-            self.current_view = self.tabs._views[index]
-            if self.current_view:
-                self.web_container.setCurrentWidget(self.current_view)
-                self.update_address_bar(self.current_view.url())
+            new_view = self.tabs._views[index]
+            if new_view:
+                old_view = self.web_container.currentWidget()
+                try:
+                    old_index = self.tabs._views.index(old_view)
+                except ValueError:
+                    old_index = index
+                direction = 1 if index >= old_index else -1
+                self.current_view = new_view
+                self._switch_view_with_transition(new_view, direction=direction)
+                self.update_address_bar(new_view.url())
+
+    def _switch_view_with_transition(self, new_view, direction=1, ghost=None):
+        """Aktif view degisimini snapshot deseniyle oynatir (DESIGN_SYSTEM §4).
+
+        Webview'e efekt/transform uygulanmaz: eski goruntunun pixmap kopyasi
+        (QLabel) yeni view'in ustunde `direction` yonune kaydirilarak cikar.
+        `ghost` verilirse hazir snapshot kullanilir (close_tab yolu — view
+        silinmeden once alinmis olmali). Reduced-motion'da gecis aninda olur.
+        """
+        old_view = self.web_container.currentWidget()
+        if ghost is None and (
+            not Motion.enabled
+            or not self.isVisible()
+            or old_view is None
+            or old_view is new_view
+        ):
+            self.web_container.setCurrentWidget(new_view)
+            return
+        if ghost is None:
+            ghost = snapshot_of(old_view)
+
+        if self._switch_ghost is not None:
+            self._switch_ghost.deleteLater()
+        self._switch_ghost = ghost
+
+        self.web_container.setCurrentWidget(new_view)
+        ghost.raise_()
+
+        start = ghost.pos()
+        end = QPoint(start.x() - direction * ghost.width(), start.y())
+
+        def _cleanup():
+            if self._switch_ghost is ghost:
+                self._switch_ghost = None
+            ghost.deleteLater()
+
+        animate(
+            ghost, b"pos", start, end,
+            duration=Motion.SLOW, easing=Motion.EXIT, on_finished=_cleanup,
+        )
 
     def navigate_to_url(self):
         text = self.address_bar.text().strip()

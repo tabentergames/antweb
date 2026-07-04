@@ -76,6 +76,16 @@ def run() -> int:
     window.tabs._request_close(window.tabs.count() - 1)
     assert window.tabs.count() == before, "reduced-motion kapatma calismadi"
 
+    # F2.5 — snapshot sekme gecisi: reduced-motion'da anlik, ghost olusmaz.
+    window.add_new_tab()
+    window.handle_tab_activated(0)
+    assert window.web_container.currentWidget() is window.tabs._views[0], (
+        "reduced-motion sekme gecisi yanlis view gosterdi"
+    )
+    assert window._switch_ghost is None, "reduced-motion'da ghost olusmamali"
+    window.close_tab(window.tabs.count() - 1)
+    assert window.tabs.count() == before, "gecis testi sekmesi kapanmadi"
+
     # Ayni akis animasyonlar acikken — bagimsiz TabWidget uzerinde
     # (webview olusturmadan). Kapatma tabClosed'u animasyon bitiminde
     # yayar; dogrulama processEvents ile pump'lanmaz (offscreen'de
@@ -90,16 +100,25 @@ def run() -> int:
     strip.add_tab(title="B")
     assert strip.count() == 2, "strip'e sekme eklenmedi"
     strip._request_close(1)
+
+    # Snapshot sekme gecisi — animasyonlu yol: ghost olusur, bitiste temizlenir.
+    window.add_new_tab()
+    window.handle_tab_activated(0)
+    assert window._switch_ghost is not None, "animasyonlu geciste ghost olusmadi"
+
     results = {}
 
     def _check_animated_close():
         results["count"] = strip.count()
+        results["ghost"] = window._switch_ghost
         Motion.configure(False)
+        window.close_tab(window.tabs.count() - 1)
         app.quit()
 
     QTimer.singleShot(500, _check_animated_close)
     app.exec()
     assert results.get("count") == 1, "animasyonlu kapatma tamamlanmadi"
+    assert results.get("ghost") is None, "gecis ghost'u animasyon sonunda temizlenmedi"
     print("SMOKE TEST PASS")
     return 0
 

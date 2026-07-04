@@ -1,9 +1,17 @@
 # Agent Handoff
 
-Son guncelleme: 2026-07-03
+Son guncelleme: 2026-07-04
 
 ## Son kararlar
 
+- **F2.5 snapshot sekme gecisi tamamlandi (2026-07-04):**
+  `BrowserWindow._switch_view_with_transition` — eski view'in `snapshot_of`
+  ghost'u yeni view ustunde `Motion.SLOW`/EXIT ile yana kayar (yon = indeks
+  farki). Kritik desenler: (1) aktif sekme kapatilirken snapshot
+  `removeWidget`'tan ONCE alinip helper'a `ghost=` ile verilir; (2) ust uste
+  hizli gecislerde onceki ghost `self._switch_ghost` uzerinden hemen silinir;
+  (3) webview'e hicbir efekt uygulanmaz. Bu desenler fan modu ve workspace
+  gecisinde de aynen kullanilmali.
 - **Toolbar duzeni + profil cipi (2026-07-03, kullanici geri bildirimi):** toolbar'daki
   mukerrer butonlar temizlendi (◉ ve ⚙ ikisi de settings aciyordu); az kullanilanlar
   `⋯` QMenu'sune indi. Aktif profil sag ucta cip olarak gorunur; cip menusu profil
@@ -38,19 +46,22 @@ Son guncelleme: 2026-07-03
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-Faz: F2.5 | Modul: `ui/tabs` + `core/browser_window.py` | Kapsam: snapshot sekme gecisi.
-(Tab strip animasyonlari bitti; animasyon sirasi geregi siradaki is bu.)
+Faz: F2.5 | Modul: `ui/tabs` + `core/browser_window.py` | Kapsam: fan sekme modu.
+(Snapshot gecisi bitti; animasyon sirasi geregi siradaki is bu.)
 
 Neden:
 
-- Animasyon gorevleri SIRALI: tab strip -> snapshot gecisi -> fan modu.
-- `snapshot_of()` yardimcisi hazir; desen DESIGN_SYSTEM.md §4'te tanimli.
+- Animasyon gorevleri SIRALI: tab strip -> snapshot gecisi -> fan modu (son halka).
+- Snapshot deseni `_switch_view_with_transition` icinde kanitlandi; fan modu
+  ayni ghost yaklasimiyla kurulur (her sekme icin snapshot karti).
 
 Net teslim kriteri:
 
-- Aktif sekme degisiminde eski view'in snapshot'i uzerinde slide/fade (`Motion.SLOW`).
-- Webview'e opacity/transform/QGraphicsEffect UYGULANMAZ; yalnizca snapshot QLabel anime edilir.
-- `Motion.configure(False)` iken gecis anlik ve dogru.
+- Fan modu bir overlay yuzeyidir: sekme snapshot'lari kart olarak yayilir,
+  karta tiklama o sekmeyi aktive eder, ESC/disari tiklama kapatir.
+- Overlay `Theme.glass_strong` + `Theme.scrim` kullanir; kartlar `Motion.SLOW` ile girer.
+- Webview'e efekt UYGULANMAZ; yalnizca snapshot QLabel'lari anime edilir.
+- `Motion.configure(False)` iken fan anlik acilir/kapanir.
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor; light+dark modda gozle bakildi.
 
 Paralel yurutulebilir ikinci gorev (farkli dosyalar):

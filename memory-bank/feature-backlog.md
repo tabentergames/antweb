@@ -24,8 +24,8 @@ Kurallar: `docs/DESIGN_SYSTEM.md`. Motion altyapisina dokunan isler SIRALI yurut
 | done | Panel ac/kapa animasyonu | Sol/sag sidebar `slide_panel` ile kayarak acilir; genislikler sinif sabiti oldu. |
 | done | Offscreen smoke test | `scripts/smoke_test.py` — pencere kurulumu, panel toggle, tema degisimi. |
 | done | Tab strip animasyonlari | Ekle/kapat `Motion.BASE` genislik animasyonu, hover `Motion.FAST` + `Theme.mix` renk gecisi; reduced-motion yolu smoke test'te. |
-| next | Snapshot sekme gecisi | Aktif sekme degisiminde `snapshot_of` + slide/fade; webview'e efekt YOK. |
-| todo | Fan sekme modu | F2'den ertelenen "vay be" ozelligi; snapshot deseni uzerine kurulur. |
+| done | Snapshot sekme gecisi | `_switch_view_with_transition` — eski view'in snapshot'i `Motion.SLOW` ile yana kayar; sekme aktivasyonu + aktif sekme kapatma yollari; reduced-motion'da anlik. |
+| next | Fan sekme modu | F2'den ertelenen "vay be" ozelligi; snapshot deseni uzerine kurulur. |
 | todo | Glass yuzey gecisi | Overlay panel/dialog/toolbar'i `Theme.glass*` tokenlarina tasi. |
 | todo | Reduced-motion ayari | `tabx://settings` toggle -> `Motion.configure`; `data/ui_state.json`'a yazilir. |
 | todo | Cikis/giris sayfa gecisi | Yeni sekme dashboard'una acilirken yumusak giris animasyonu. |

@@ -1,6 +1,6 @@
 # Current State
 
-Son guncelleme: 2026-07-03
+Son guncelleme: 2026-07-04
 
 ## Repodaki gercek durum
 
@@ -30,8 +30,9 @@ Son guncelleme: 2026-07-03
   - **F2.5 tasarim tokenlari:** `ui/theme.py` — SPACE_XS..XL, RADIUS_SM..PILL sabitleri + light/dark `glass`, `glass_strong`, `glass_border`, `scrim` seffaf yuzey renkleri.
   - Sol/sag sidebar `slide_panel` ile animasyonlu acilip kapaniyor; genislikler `BrowserWindow.LEFT/RIGHT_SIDEBAR_WIDTH` sabitlerinde.
   - **F2.5 tab strip animasyonlari:** `ui/tabs/tab_strip.py` — sekme ekleme buyuyerek girer (`Motion.BASE`/ENTER), kapatma daralarak cikar (`Motion.BASE`/EXIT, `tabClosed` animasyon bitiminde yayilir), hover `hoverProgress` pyqtProperty + `Theme.mix` renk gecisiyle (`Motion.FAST`). Reduced-motion'da hepsi anlik.
+  - **F2.5 snapshot sekme gecisi:** `core/browser_window.py::_switch_view_with_transition` — aktif sekme degisiminde eski view'in snapshot'i (`snapshot_of`) yeni view ustunde `Motion.SLOW`/EXIT ile yana kayar; yon sekme indeks farkina gore. Aktif sekme kapatilirken snapshot `removeWidget`'tan once alinir. Webview'e efekt uygulanmaz; reduced-motion'da gecis anlik.
   - **Gorsel tutarlilik anayasasi:** `docs/DESIGN_SYSTEM.md` — token kullanimi, hareket dili, webview snapshot deseni, UI teslim kontrol listesi.
-  - **Smoke test:** `scripts/smoke_test.py` — offscreen pencere kurulumu, panel toggle, tema degisimi + F4 store/workspace kontrolleri.
+  - **Smoke test:** `scripts/smoke_test.py` — offscreen pencere kurulumu, panel toggle, tema degisimi, F4 store/workspace kontrolleri + snapshot sekme gecisi (reduced-motion anlik yol + animasyonlu yolda ghost olusumu/temizligi).
   - **F4 — Oturum restore:** `core/session.py` — profil+workspace bazli sekme seti kaydi (`data/sessions.json`); kapanis, tema degisimi ve workspace/profil gecislerinde kaydedilir, acilista geri yuklenir.
   - **F4 — Profiller:** isimli `QWebEngineProfile` + ayrik storage/cache (`data/profiles/<ad>`); `tabx://settings` uzerinden gecis ve yeni profil; F3 gizlilik katmani her profile yeniden baglanir.
   - **F4 — Workspace:** sag panelde "Calisma Alanlari" bolumu; workspace basina sekme seti, gecis/ekle/sil.
