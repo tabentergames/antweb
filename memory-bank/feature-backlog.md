@@ -92,6 +92,7 @@ Her biri kapatilabilir modul olarak `features/` altina gider; cekirdege gomulmez
 | done | Toolbar duzeni + profil cipi | Butonlar gruplu (`⋯` overflow menusu), aktif profil toolbar'da cip olarak gorunur; cip menusunden profil gecisi/ekleme. |
 | done | Settings sayfasi | `tabx://settings` ic route olarak basladi; gercek ayar kontrolleri sonraki dilim. |
 | done | About sayfasi | `tabx://about` ic route olarak basladi; surum/build bilgisi otomatik degil. |
+| todo | Sekme favicon'lari | `QWebEnginePage.iconChanged` -> TabButton'daki renkli noktanin yerine site ikonu; fan kartlarinda da kullanilabilir. |
 | todo | Error page | Ag/sertifika hata sayfalari icin TabX tasarimi. |
 | todo | Context menu | Geri/ileri, linki yeni sekmede ac, kopyala, inspect. |
 | todo | Keyboard shortcuts | Yeni sekme/kapat/yenile/omnibox ve ayarlanabilir kisayollar. |

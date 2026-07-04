@@ -1443,6 +1443,7 @@ class BrowserWindow(QMainWindow):
                 background-color: {Theme.panel_alt};
                 color: {Theme.text};
             }}
+            QPushButton::menu-indicator {{ width: 0px; }}
             """
         )
         return btn
@@ -1579,8 +1580,11 @@ class BrowserWindow(QMainWindow):
             internal_page = self._internal_page_key(url)
             if internal_page:
                 self._load_internal_page(self.current_view, internal_page)
-                return
-            self.current_view.setUrl(url)
+            else:
+                self.current_view.setUrl(url)
+            # Enter sonrasi odak sayfaya gecer; URL secili kalmaz.
+            self.address_bar.deselect()
+            self.current_view.setFocus()
 
     def update_address_bar(self, url):
         self._update_bookmark_button(url)

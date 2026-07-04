@@ -41,6 +41,9 @@ class TabButton(QFrame):
         layout.addWidget(self.icon_label)
 
         self.title_label = QLabel(self._title)
+        # Uzun basliklar kaba kirpilmasin: metin, etiketin o anki genisligine
+        # gore "…" ile kisaltilir (resizeEvent her genislik degisiminde gunceller).
+        self.title_label.setMinimumWidth(0)
         self.title_label.setAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )
@@ -127,9 +130,23 @@ class TabButton(QFrame):
                 duration=Motion.FAST, easing=Motion.EXIT,
             )
 
+    def _update_title_elide(self):
+        width = self.title_label.width()
+        if width <= 0:
+            self.title_label.setText(self._title)
+            return
+        metrics = self.title_label.fontMetrics()
+        self.title_label.setText(
+            metrics.elidedText(self._title, Qt.TextElideMode.ElideRight, width)
+        )
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        self._update_title_elide()
+
     def setTitle(self, text):
         self._title = text
-        self.title_label.setText(text)
+        self._update_title_elide()
         self.setMaximumWidth(self.natural_max_width())
 
     def setActive(self, active):
