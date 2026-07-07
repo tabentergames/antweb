@@ -29,6 +29,9 @@ def run() -> int:
 
     window = BrowserWindow()
     window.show()
+    # BrowserWindow.__init__ kalici reduced_motion tercihini uygular; testi
+    # deterministik tutmak icin acilistan sonra tekrar kapatiyoruz.
+    Motion.configure(False)
 
     window.toggle_left_sidebar(True)
     window.toggle_right_sidebar(True)
@@ -68,6 +71,21 @@ def run() -> int:
     assert window.profile_name in window.profile_chip.text(), "profil cipi adi gostermiyor"
     window._populate_profile_menu()
     assert window.profile_menu.actions(), "profil menusu bos"
+
+    # F2.5 — reduced motion ayari: toggle + tabx://settings komut linki + kalicilik.
+    from PyQt6.QtCore import QUrl
+    from core.browser_window import UiStateStore
+
+    assert window.reduced_motion is False, "varsayilan reduced_motion False olmali"
+    window.toggle_reduced_motion()
+    assert window.reduced_motion is True, "reduced_motion acilmadi"
+    assert Motion.enabled is False, "Motion.configure reduced_motion ile senkron degil"
+    assert UiStateStore.load()["reduced_motion"] is True, "reduced_motion kalici state'e yazilmadi"
+    window._handle_internal_url(window.current_view, QUrl("tabx://settings/reduced-motion"))
+    assert window.reduced_motion is False, "settings komutu toggle etmedi"
+    assert Motion.enabled is True, "Motion.configure geri acilmadi"
+    assert UiStateStore.load()["reduced_motion"] is False, "reduced_motion kalici state geri yazilmadi"
+    Motion.configure(False)
 
     # F2.5 — tab strip ekle/kapat: once reduced-motion yolu (deterministik).
     before = window.tabs.count()

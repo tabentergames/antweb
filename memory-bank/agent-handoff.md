@@ -1,9 +1,22 @@
 # Agent Handoff
 
-Son guncelleme: 2026-07-04
+Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **F2.5 reduced-motion ayari tamamlandi (2026-07-07):** `tabx://settings` "Hareket"
+  karti — `BrowserWindow.toggle_reduced_motion()` `Motion.configure` cagirir ve
+  `UiStateStore`'a yeni `reduced_motion` alanini yazar (`defaults`/`load`/`save`
+  hepsine eklendi). Acilista `__init__` icinde `Theme.configure` hemen sonrasi
+  `Motion.configure(not self.reduced_motion)` cagrilir — Theme icin kurulan
+  "_load_ui_state -> X.configure" deseni Motion'a da uygulandi. Komut linki
+  `tabx://settings/reduced-motion` -> `_handle_internal_url` -> toggle + sayfa
+  yeniden yuklenir (destructive olmadigi icin `QTimer.singleShot` gerekmedi,
+  profil gecisinden farkli). Kritik desen: smoke test global `Motion.configure(False)`
+  ayarini `BrowserWindow()` olusturmadan ONCE koyuyordu; window artik kendi
+  kalici tercihine gore Motion'i yeniden ayarladigi icin test'in bunu pencere
+  olusturulduktan SONRA tekrar `Motion.configure(False)` ile ezmesi gerekti —
+  Motion durumuna dokunan her yeni smoke test bu sirayla dikkat etmeli.
 - **F2.5 fan sekme modu tamamlandi (2026-07-04):** `ui/tabs/fan_overlay.py` —
   animasyon zincirinin son halkasi (tab strip -> snapshot gecisi -> fan modu).
   Kritik desenler: (1) arka plandaki QWebEngineView'ler guvenilir grab
@@ -56,32 +69,34 @@ Son guncelleme: 2026-07-04
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-Faz: F2.5 | Modul: `core/browser_window.py` (settings sayfasi) + `ui/motion.py` |
-Kapsam: reduced-motion ayari.
-(Animasyon zinciri bitti; motion katmanini kullaniciya acan son dilim bu.)
+Faz: F2.5 | Modul: `ui/theme.py`, `core/browser_window.py` (sidebar/dialog QSS) |
+Kapsam: glass yuzey gecisi.
+(Reduced-motion ayari tamamlandi; animasyon+erisilebilirlik dilimi kapandi.
+ Sira DESIGN_SYSTEM §2'de tanimli glass/scrim yuzeylerin gercek UI'a yayilmasinda.)
 
 Neden:
 
-- `Motion.configure` yalnizca kod tarafinda; erisilebilirlik icin kullanici
-  toggle'i gerekiyor. Kucuk, net sinirli bir dilim.
-- Ic sayfa komut linki deseni hazir (`tabx://settings/profile?name=` ornekleri).
+- `Theme.glass`, `glass_strong`, `glass_border`, `scrim` tokenlari F2.5'te
+  eklendi ve su an yalnizca fan overlay kullaniyor; sol/sag sidebar ve
+  dialoglar hala duz `Theme.panel` renginde.
+- Kucuk, gorsel olarak dogrulanabilir bir dilim; DESIGN_SYSTEM §7 teslim
+  kontrol listesiyle uyumlu.
 
 Net teslim kriteri:
 
-- `tabx://settings` icinde "Animasyonlari azalt" toggle'i; `tabx://settings/...`
-  komut linki deseniyle calisir.
-- Tercih `data/ui_state.json`'a yazilir; acilista `Motion.configure` ile uygulanir.
-- Toggle acikken tum animasyonlar (panel, tab strip, snapshot gecisi, fan) anlik.
-- `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
-
-Paralel yurutulebilir ikinci gorev (farkli yuzeyler): glass yuzey gecisi —
-sol/sag sidebar ve dialog yuzeylerini `Theme.glass*` tokenlarina tasi
-(DESIGN_SYSTEM §2).
+- Sol/sag sidebar ve `TextInputDialog`/`ConfirmDialog` (veya esdegeri) arka
+  planlari `Theme.glass*` tokenlarina tasinir; light+dark ikisinde de kontrast
+  korunur.
+- `python3 main.py` + `python3 scripts/smoke_test.py` geciyor; animasyon
+  gorsel olarak dogrulanamadiysa teslim notunda hangi ekranin manuel
+  kontrol edilecegi belirtilir.
 
 Paralel yurutulebilir ikinci gorev (farkli dosyalar):
 
 Faz: F3 | Modul: `features/privacy` | Kapsam: adblock/HTTPS upgrade toggle'larini
-`tabx://settings` yuzeyine baglama; state `data/ui_state.json`'da.
+`tabx://settings` yuzeyine baglama; state `data/ui_state.json`'da. Komut linki
+deseni icin `tabx://settings/reduced-motion` (bu tur) ve `settings/profile?name=`
+ornek alinabilir.
 
 ## Teslim notu formati
 

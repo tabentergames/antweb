@@ -52,6 +52,7 @@ class UiStateStore:
     defaults = {
         "theme_mode": "light",
         "tab_position": "top",
+        "reduced_motion": False,
         "profile": "default",
         "profiles": ["default"],
         "custom_nav_items": [],
@@ -85,6 +86,8 @@ class UiStateStore:
                 state["theme_mode"] = loaded["theme_mode"]
             if loaded.get("tab_position") in {"top", "bottom"}:
                 state["tab_position"] = loaded["tab_position"]
+            if isinstance(loaded.get("reduced_motion"), bool):
+                state["reduced_motion"] = loaded["reduced_motion"]
             profiles = [
                 str(p).strip()
                 for p in loaded.get("profiles", [])
@@ -114,12 +117,14 @@ class UiStateStore:
         tab_position="top",
         profile="default",
         profiles=None,
+        reduced_motion=False,
     ):
         cls.state_path.parent.mkdir(parents=True, exist_ok=True)
         profiles = [str(p) for p in (profiles or ["default"])] or ["default"]
         payload = {
             "theme_mode": "dark" if theme_mode == "dark" else "light",
             "tab_position": "bottom" if tab_position == "bottom" else "top",
+            "reduced_motion": bool(reduced_motion),
             "profile": profile if profile in profiles else profiles[0],
             "profiles": profiles,
             "custom_nav_items": [
@@ -333,6 +338,7 @@ class BrowserWindow(QMainWindow):
         self._retired_profiles = []
         self._load_ui_state()
         Theme.configure(self.theme_mode)
+        Motion.configure(not self.reduced_motion)
         self._setup_web_profile()
 
         app = QApplication.instance()
@@ -422,6 +428,7 @@ class BrowserWindow(QMainWindow):
         state = UiStateStore.load()
         self.theme_mode = state.get("theme_mode", "light")
         self.tab_position = state.get("tab_position", "top")
+        self.reduced_motion = bool(state.get("reduced_motion", False))
         self.profiles = state.get("profiles", ["default"])
         self.profile_name = state.get("profile", self.profiles[0])
         self.custom_nav_items = [
@@ -457,6 +464,7 @@ class BrowserWindow(QMainWindow):
             self.tab_position,
             self.profile_name,
             self.profiles,
+            self.reduced_motion,
         )
 
     def _create_left_rail(self):
@@ -1017,6 +1025,11 @@ class BrowserWindow(QMainWindow):
         self.tab_position = "bottom" if self.tab_position == "top" else "top"
         self._save_ui_state()
         self._place_center_widgets()
+
+    def toggle_reduced_motion(self):
+        self.reduced_motion = not self.reduced_motion
+        Motion.configure(not self.reduced_motion)
+        self._save_ui_state()
 
     # ------------------------------------------------------------------
     # F4 — profil ve workspace
@@ -1702,6 +1715,10 @@ class BrowserWindow(QMainWindow):
         if key == "settings" and action == "profile-new":
             QTimer.singleShot(0, self.add_profile)
             return
+        if key == "settings" and action == "reduced-motion":
+            self.toggle_reduced_motion()
+            self._load_internal_page(view, "settings")
+            return
         self._load_internal_page(view, key)
 
     def _record_history(self, ok, view):
@@ -1856,6 +1873,12 @@ class BrowserWindow(QMainWindow):
         tab_position_label = (
             "Sekmeler altta" if self.tab_position == "bottom" else "Sekmeler üstte"
         )
+        motion_label = (
+            "Animasyonlar azaltıldı" if self.reduced_motion else "Animasyonlar açık"
+        )
+        motion_action_label = (
+            "Animasyonları aç" if self.reduced_motion else "Animasyonları azalt"
+        )
         profile_pills = []
         for name in self.profiles:
             safe = html_module.escape(name, quote=True)
@@ -1892,6 +1915,14 @@ class BrowserWindow(QMainWindow):
                 <div class="pill-row">
                   <span class="pill status">{theme_label}</span>
                   <span class="pill">Kalıcı tercih</span>
+                </div>
+              </article>
+              <article class="card">
+                <h2>Hareket</h2>
+                <p>Panel, sekme ve fan geçiş animasyonlarını tek yerden aç/kapat. Tercih kalıcıdır.</p>
+                <div class="pill-row">
+                  <span class="pill status">{motion_label}</span>
+                  <a class="pill" style="text-decoration:none;" href="tabx://settings/reduced-motion">{motion_action_label}</a>
                 </div>
               </article>
               <article class="card">
