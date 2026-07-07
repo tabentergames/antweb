@@ -63,6 +63,7 @@ class UiStateStore:
         "ad_block_enabled": True,
         "https_upgrade_enabled": True,
         "permission_mode": "ask",
+        "search_engine": "google",
         "profile": "default",
         "profiles": ["default"],
         "custom_nav_items": [],
@@ -98,6 +99,14 @@ class UiStateStore:
                 ],
             },
         ],
+    }
+
+    # Desteklenen arama motorlari: anahtar -> (gorunen ad, sorgu URL sablonu).
+    search_engines = {
+        "google": ("Google", "https://www.google.com/search?q={}"),
+        "bing": ("Bing", "https://www.bing.com/search?q={}"),
+        "duckduckgo": ("DuckDuckGo", "https://duckduckgo.com/?q={}"),
+        "yandex": ("Yandex", "https://yandex.com.tr/search/?text={}"),
     }
 
     # Eski (2 elemanli) kayitlari URL'ye kavusturmak icin bilinen site tablosu.
@@ -136,6 +145,8 @@ class UiStateStore:
                 state["https_upgrade_enabled"] = loaded["https_upgrade_enabled"]
             if loaded.get("permission_mode") in {"ask", "allow", "block"}:
                 state["permission_mode"] = loaded["permission_mode"]
+            if loaded.get("search_engine") in cls.search_engines:
+                state["search_engine"] = loaded["search_engine"]
             profiles = [
                 str(p).strip()
                 for p in loaded.get("profiles", [])
@@ -169,6 +180,7 @@ class UiStateStore:
         ad_block_enabled=True,
         https_upgrade_enabled=True,
         permission_mode="ask",
+        search_engine="google",
     ):
         cls.state_path.parent.mkdir(parents=True, exist_ok=True)
         profiles = [str(p) for p in (profiles or ["default"])] or ["default"]
@@ -179,6 +191,7 @@ class UiStateStore:
             "ad_block_enabled": bool(ad_block_enabled),
             "https_upgrade_enabled": bool(https_upgrade_enabled),
             "permission_mode": permission_mode if permission_mode in {"ask", "allow", "block"} else "ask",
+            "search_engine": search_engine if search_engine in cls.search_engines else "google",
             "profile": profile if profile in profiles else profiles[0],
             "profiles": profiles,
             "custom_nav_items": [
@@ -603,6 +616,7 @@ class BrowserWindow(QMainWindow):
         self.ad_block_enabled = bool(state.get("ad_block_enabled", True))
         self.https_upgrade_enabled = bool(state.get("https_upgrade_enabled", True))
         self.permission_mode = state.get("permission_mode", "ask")
+        self.search_engine = state.get("search_engine", "google")
         self.profiles = state.get("profiles", ["default"])
         self.profile_name = state.get("profile", self.profiles[0])
         self.custom_nav_items = [
@@ -649,6 +663,7 @@ class BrowserWindow(QMainWindow):
             self.ad_block_enabled,
             self.https_upgrade_enabled,
             self.permission_mode,
+            self.search_engine,
         )
 
     def _set_rail_button_active(self, btn, active):
@@ -1155,6 +1170,20 @@ class BrowserWindow(QMainWindow):
         self.https_upgrade_enabled = not self.https_upgrade_enabled
         self.privacy.set_https_upgrade_enabled(self.https_upgrade_enabled)
         self._save_ui_state()
+
+    def set_search_engine(self, engine):
+        if engine not in UiStateStore.search_engines or engine == self.search_engine:
+            return
+        self.search_engine = engine
+        self._save_ui_state()
+
+    def search_url(self, query):
+        """Secili arama motorunda sorgu URL'si uretir."""
+        _name, template = UiStateStore.search_engines.get(
+            self.search_engine, UiStateStore.search_engines["google"]
+        )
+        encoded = QUrl.toPercentEncoding(query).data().decode()
+        return template.format(encoded)
 
     def _confirm_clear_site_data(self):
         # Ayri metod: smoke test modal dialogu monkeypatch'leyebilsin.
@@ -1682,8 +1711,7 @@ class BrowserWindow(QMainWindow):
     def _open_group_item(self, label, url):
         """Kayitli sekmeyi yeni sekmede acar; URL yoksa etiketle arama yapar."""
         if not url:
-            query = QUrl.toPercentEncoding(label).data().decode()
-            url = f"https://www.google.com/search?q={query}"
+            url = self.search_url(label)
         self.add_new_tab(QUrl(url), label)
 
     def _tab_group_item_row(self, group_index, item_index, initials, label, url=""):
@@ -1920,7 +1948,17 @@ class BrowserWindow(QMainWindow):
         text = self.address_bar.text().strip()
         if not text:
             return
-        url = QUrl.fromUserInput(text)
+        # URL gibi gorunmeyen girdiler (bosluk iceren ya da noktasiz)
+        # secili arama motoruna gider; tabx:// ve localhost muaf.
+        looks_like_url = (
+            text.startswith(("tabx://", "http://", "https://", "file://"))
+            or text.startswith("localhost")
+            or (" " not in text and "." in text)
+        )
+        if not looks_like_url:
+            url = QUrl(self.search_url(text))
+        else:
+            url = QUrl.fromUserInput(text)
         if self.current_view:
             internal_page = self._internal_page_key(url)
             if internal_page:
@@ -2150,6 +2188,10 @@ class BrowserWindow(QMainWindow):
             return
         if key == "settings" and action == "permission-mode":
             self.set_permission_mode(query.queryItemValue("value").strip())
+            self._load_internal_page(view, "settings")
+            return
+        if key == "settings" and action == "search-engine":
+            self.set_search_engine(query.queryItemValue("value").strip())
             self._load_internal_page(view, "settings")
             return
         if key == "settings" and action == "clear-site-data":
@@ -2399,6 +2441,16 @@ class BrowserWindow(QMainWindow):
             '<span class="pill status">Temizlendi ✓</span>' if self._site_data_cleared else ""
         )
         self._site_data_cleared = False  # tek seferlik onay rozeti
+        search_pills = []
+        for engine_key, (engine_name, _template) in UiStateStore.search_engines.items():
+            if engine_key == self.search_engine:
+                search_pills.append(f'<span class="pill status">{engine_name} ✓</span>')
+            else:
+                search_pills.append(
+                    f'<a class="pill" style="text-decoration:none;" '
+                    f'href="tabx://settings/search-engine?value={engine_key}">{engine_name}</a>'
+                )
+        search_pills_html = "".join(search_pills)
         permission_options = [
             ("ask", "Her seferinde sor"),
             ("allow", "Her zaman izin ver"),
@@ -2490,7 +2542,8 @@ class BrowserWindow(QMainWindow):
               </article>
               <article class="card">
                 <h2>Arama</h2>
-                <p>Varsayılan arama motoru, omnibox önerileri ve geçmiş bazlı tamamlama burada ayarlanacak.</p>
+                <p>Adres çubuğuna URL olmayan bir şey yazınca ve kısayol aramalarında bu motor kullanılır.</p>
+                <div class="pill-row">{search_pills_html}</div>
               </article>
             </section>
           </main>

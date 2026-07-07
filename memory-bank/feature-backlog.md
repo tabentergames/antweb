@@ -112,5 +112,6 @@ Her biri kapatilabilir modul olarak `features/` altina gider; cekirdege gomulmez
 | done | About sayfasi | `tabx://about` ic route olarak basladi; surum/build bilgisi otomatik degil. |
 | done | Sekme favicon'lari | `iconChanged` -> `setTabIcon` -> `TabButton.set_icon` (16px, nokta fallback). Fan kartlarinda kullanim sonraki dilim. |
 | done | Error page | `loadingChanged`/`LoadFailedStatus` -> `_show_error_page`; TabX temali sablon (tekrar dene + ana sayfa), abort'lar (`LoadStoppedStatus`) hata sayilmaz, HTTPS-fallback ile carpismaz. E2E dogrulandi (gercek DNS hatasi). |
+| done | Arama motoru secimi | `UiStateStore.search_engines` (Google/Bing/DuckDuckGo/Yandex); `tabx://settings/search-engine?value=` pill grubu, `search_url()` helper. Adres cubugu URL olmayan girdiyi secili motorda arar; grup/kisayol fallback'i de ayni motoru kullanir. |
 | done | Context menu | `BrowserTab.contextMenuEvent` + `_build_context_menu` — geri/ileri/yenile, linki yeni sekmede ac, link/secim/sayfa adresi kopyala; `_menu_style()` temali. Inspect F6 DevTools dilimine ertelendi. |
 | done | Keyboard shortcuts | `_setup_shortcuts` — Cmd+T/W/R, Cmd+[/], Cmd+L (adres), fiziksel Ctrl+Tab (sekme dongusu), Cmd+1..9 (9=son), Cmd+Y (gecmis), Cmd+Shift+J (indirilenler). ApplicationShortcut context. Ayarlanabilir kisayollar sonraki dilim. |

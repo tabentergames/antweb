@@ -4,6 +4,14 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **Arama motoru secimi tamamlandi (2026-07-07, kullanici istegi):**
+  `UiStateStore.search_engines` sinif tablosu (anahtar -> (ad, URL sablonu));
+  yeni motor eklemek = tabloya satir eklemek, UI pill'leri otomatik uretilir.
+  `navigate_to_url`'deki URL/arama ayrimi bilincli basit tutuldu: bosluk
+  iceren VEYA nokta icermeyen girdi arama sayilir (tabx://, http(s),
+  file://, localhost muaf). `search_url()` tum arama fallback'lerinin tek
+  kaynagi — `_open_group_item` ve ozel kisayollar da bunu kullanir; yeni
+  arama ihtiyaci olan her yer BU helper'i cagirmali, sablon kopyalamamali.
 - **F3 site veri temizleme tamamlandi (2026-07-07) — F3 FAZI KAPANDI:**
   Gizlilik kartinda pill komutu; onay `_confirm_clear_site_data` AYRI metod
   (izin panelindeki desenle ayni: smoke test modali monkeypatch'ler).

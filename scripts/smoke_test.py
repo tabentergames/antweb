@@ -314,6 +314,29 @@ def run() -> int:
     assert not any("Seçimi kopyala" in t for t in plain_texts), "secimsiz menude kopyala var"
     assert any("Sayfa adresini" in t for t in plain_texts), "sayfa adresi kopyala yok"
 
+    # Arama motoru secimi — kalicilik + search_url + adres cubugu fallback'i.
+    assert window.search_engine == "google", "varsayilan arama motoru google olmali"
+    assert "google.com/search?q=merhaba%20d%C3%BCnya" in window.search_url("merhaba dünya").replace("+", "%20") or "google.com/search" in window.search_url("merhaba dünya"), "search_url google uretmedi"
+    window.set_search_engine("duckduckgo")
+    assert UiStateStore.load()["search_engine"] == "duckduckgo", "arama motoru kalici degil"
+    assert "duckduckgo.com" in window.search_url("tabx"), "secili motor kullanilmiyor"
+    window._handle_internal_url(
+        window.current_view, QUrl("tabx://settings/search-engine?value=google")
+    )
+    assert window.search_engine == "google", "settings komutu arama motorunu degistirmedi"
+    window.set_search_engine("olmayan-motor")
+    assert window.search_engine == "google", "gecersiz motor kabul edildi"
+    assert "Arama" in window._settings_page_html() and "search-engine" in window._settings_page_html(), "arama karti eksik"
+
+    se_before = window.tabs.count()
+    window.address_bar.setText("merhaba dünya")
+    window.navigate_to_url()
+    assert "google.com" in window.current_view.url().toString(), "adres cubugu aramaya gitmedi"
+    window.address_bar.setText("example.com")
+    window.navigate_to_url()
+    assert "example.com" in window.current_view.url().toString(), "duz alan adi URL sayilmadi"
+    assert window.tabs.count() == se_before, "arama testi sekme sayisini degistirdi"
+
     # F3 — site veri temizleme: onayli akis + tek seferlik rozet.
     window._confirm_clear_site_data = lambda: True
     window.clear_site_data()
