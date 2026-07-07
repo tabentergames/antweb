@@ -4,6 +4,14 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **F3 site veri temizleme tamamlandi (2026-07-07) — F3 FAZI KAPANDI:**
+  Gizlilik kartinda pill komutu; onay `_confirm_clear_site_data` AYRI metod
+  (izin panelindeki desenle ayni: smoke test modali monkeypatch'ler).
+  Dialog `_handle_internal_url` icinde `QTimer.singleShot(0, ...)` ile
+  ertelenir — navigasyon callback'inde modal exec etme. "Temizlendi ✓"
+  rozeti `_site_data_cleared` bayragiyla TEK SEFERLIK: `_settings_page_html`
+  render'inda tuketilir. Local storage temizleme bilincli kapsam disi
+  (profil klasoru silmek gerekir; istenirse ayri dilim).
 - **Error page tamamlandi (2026-07-07):** `loadFinished(ok=False)` DEGIL,
   `page.loadingChanged` + `QWebEngineLoadingInfo.LoadStatus` kullanildi —
   kritik ayrim: `LoadStoppedStatus` (kullanici iptali / hizli navigasyon)
@@ -227,23 +235,18 @@ Klavye kisayollari ve Downloads tamamlandi. "Temel tarayici yuzeyleri"nde
 kalan dilimler: context menu, sekme favicon'lari, error page. F3'te yalnizca
 site veri temizleme kaldi. Onerilen siradaki is:
 
-"Temel tarayici yuzeyleri" fazi KAPANDI (downloads, kisayollar, context
-menu, error page, favicon, toolbar/panel tasarimi hepsi done). Kalan tek
-kucuk F3 isi:
+"Temel tarayici yuzeyleri" ve F3 fazlari KAPANDI. Acik fazlar yalnizca
+F5 Productivity, F6 Developer Tools ve F7 Power UX (ucu de bos) + F2.5'in
+iki dusuk oncelikli arastirma dilimi.
 
-Faz: F3 | Modul: `core/browser_window.py` (`_settings_page_html`,
-`_handle_internal_url`) | Kapsam: site veri temizleme — Gizlilik kartina
-"Site verilerini temizle" komutu; `web_profile.clearHttpCache()` +
-`web_profile.cookieStore().deleteAllCookies()`. Komut linki deseni hazir
-(`tabx://settings/clear-site-data`); islem sonrasi sayfa yeniden yuklenip
-kisa onay gosterilebilir.
-
-Bundan sonrasi yeni faz secimi: F5 Productivity (todo widget, kanban,
-notlar, web clipper), F6 Developer Tools (snippet, UA gecisi, request log,
-DevTools) veya F7 Power UX (split view, komut paleti, video pop-out...).
-Kullanici gorsel cilaya deger veriyor; F7'nin komut paleti (Cmd+K,
-glass_strong overlay) iyi bir ilk aday olabilir — karar kullaniciya
-sorulmali.
+Yeni faz secimi KULLANICIYA SORULMALI. Kullanici gorsel cilaya deger
+veriyor; F7'nin komut paleti (Cmd+K, `Theme.glass_strong` overlay, sekme/
+ayar/komut aramasi) iyi bir ilk aday. Komut paleti icin hazir yapi taslari:
+FanOverlay'in scrim+glass+ESC/dis-tiklama deseni, `_setup_shortcuts`
+(Ctrl+K eklenir), `Theme` tokenlari. F5 secilirse floating todo widget
+(SQLite, `features/library/store.py` deseni) ilk dilim onerisi; F6
+secilirse DevTools penceresi (QWebEnginePage.setDevToolsPage) en somut
+baslangic.
 
 Neden:
 

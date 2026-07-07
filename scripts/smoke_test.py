@@ -314,6 +314,18 @@ def run() -> int:
     assert not any("Seçimi kopyala" in t for t in plain_texts), "secimsiz menude kopyala var"
     assert any("Sayfa adresini" in t for t in plain_texts), "sayfa adresi kopyala yok"
 
+    # F3 — site veri temizleme: onayli akis + tek seferlik rozet.
+    window._confirm_clear_site_data = lambda: True
+    window.clear_site_data()
+    assert window._site_data_cleared is True, "site verisi temizleme flag'i kalkmadi"
+    cleared_html = window._settings_page_html()
+    assert "Temizlendi" in cleared_html, "temizlendi rozeti gorunmedi"
+    assert "clear-site-data" in cleared_html, "temizleme komut linki yok"
+    assert "Temizlendi" not in window._settings_page_html(), "rozet tek seferlik degil"
+    window._confirm_clear_site_data = lambda: False
+    window.clear_site_data()
+    assert window._site_data_cleared is False, "onay reddi temizleme yapti"
+
     # Error page — hata durum ayrimi + sablon + https-fallback carpismasi yok.
     from PyQt6.QtWebEngineCore import QWebEngineLoadingInfo
 

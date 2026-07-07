@@ -57,7 +57,7 @@ Kullanici geri bildirimiyle acildi (2026-07-07): sag panel/toolbar/ayarlar sadel
 | done | HTTPS upgrade | features/privacy/https_upgrade.py — HTTP→HTTPS redirect, localhost muaf. |
 | done | Ayar sayfasi toggle'lari | `tabx://settings` "Gizlilik" karti — ad blocker ve HTTPS upgrade icin ac/kapat, `data/ui_state.json`'a yazilir, profil gecisinde/acilista uygulanir. |
 | done | Izin paneli | `QWebEnginePage.permissionRequested` -> `_handle_permission_request`; global mod (sor/her zaman izin ver/her zaman reddet) `tabx://settings` "Izinler" kartinda, `data/ui_state.json.permission_mode`. Kamera/mikrofon/konum/bildirim kapsar; "sor" modu `ConfirmDialog` ile calisir. |
-| todo | Site veri temizleme | Cache/cookie/local storage temizleme UI'i. |
+| done | Site veri temizleme | Gizlilik kartinda "Site verilerini temizle" — ConfirmDialog onayi sonrasi `clearHttpCache` + `deleteAllCookies`; tek seferlik "Temizlendi ✓" rozeti. Local storage temizleme profil klasoru silmeyi gerektirir, kapsam disi. |
 
 ## F4 - Profil & Workspace
 

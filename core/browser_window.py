@@ -478,6 +478,7 @@ class BrowserWindow(QMainWindow):
         self.right_sidebar_open = False
         self._retired_profiles = []
         self._collapsed_groups = set()
+        self._site_data_cleared = False
         self._load_ui_state()
         Theme.configure(self.theme_mode)
         Motion.configure(not self.reduced_motion)
@@ -1154,6 +1155,22 @@ class BrowserWindow(QMainWindow):
         self.https_upgrade_enabled = not self.https_upgrade_enabled
         self.privacy.set_https_upgrade_enabled(self.https_upgrade_enabled)
         self._save_ui_state()
+
+    def _confirm_clear_site_data(self):
+        # Ayri metod: smoke test modal dialogu monkeypatch'leyebilsin.
+        return ConfirmDialog.ask(
+            self,
+            "Site verilerini temizle",
+            "Tüm çerezler ve HTTP önbelleği silinecek; sitelerdeki oturumların kapanabilir. Devam edilsin mi?",
+            confirm_label="Temizle",
+        )
+
+    def clear_site_data(self):
+        if not self._confirm_clear_site_data():
+            return
+        self.web_profile.clearHttpCache()
+        self.web_profile.cookieStore().deleteAllCookies()
+        self._site_data_cleared = True
 
     def set_permission_mode(self, mode):
         if mode not in {"ask", "allow", "block"} or mode == self.permission_mode:
@@ -2135,6 +2152,14 @@ class BrowserWindow(QMainWindow):
             self.set_permission_mode(query.queryItemValue("value").strip())
             self._load_internal_page(view, "settings")
             return
+        if key == "settings" and action == "clear-site-data":
+            # Modal dialog navigasyon callback'i icinde acilmamali; ertele.
+            def _run(v=view):
+                self.clear_site_data()
+                self._load_internal_page(v, "settings")
+
+            QTimer.singleShot(0, _run)
+            return
         self._load_internal_page(view, key)
 
     def _handle_load_status(self, view, info):
@@ -2370,6 +2395,10 @@ class BrowserWindow(QMainWindow):
         ) + self._switch_row_html(
             "HTTPS upgrade", self.https_upgrade_enabled, "tabx://settings/https-upgrade"
         )
+        cleared_pill = (
+            '<span class="pill status">Temizlendi ✓</span>' if self._site_data_cleared else ""
+        )
+        self._site_data_cleared = False  # tek seferlik onay rozeti
         permission_options = [
             ("ask", "Her seferinde sor"),
             ("allow", "Her zaman izin ver"),
@@ -2447,8 +2476,12 @@ class BrowserWindow(QMainWindow):
               </article>
               <article class="card">
                 <h2>Gizlilik</h2>
-                <p>İstek engelleme ve HTTPS yükseltme koruması; site verisi temizleme sonraki dilim.</p>
+                <p>İstek engelleme, HTTPS yükseltme koruması ve site verisi temizleme.</p>
                 <div class="switch-list">{privacy_switches}</div>
+                <div class="pill-row">
+                  {cleared_pill}
+                  <a class="pill" style="text-decoration:none;" href="tabx://settings/clear-site-data">Site verilerini temizle</a>
+                </div>
               </article>
               <article class="card">
                 <h2>İzinler</h2>
