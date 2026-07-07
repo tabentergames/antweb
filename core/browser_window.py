@@ -26,7 +26,7 @@ from features.privacy.service import PrivacyService
 from features.downloads.manager import DownloadManager
 from features.library.store import BookmarkStore, HistoryStore
 from core.session import DEFAULT_WORKSPACE, SessionStore
-from ui.motion import Motion, animate, slide_panel, snapshot_of
+from ui.motion import Motion, animate, snapshot_of
 from ui.tabs.fan_overlay import FanOverlay
 from ui.tabs.tab_strip import TabWidget
 from ui.theme import Theme
@@ -473,16 +473,38 @@ class BrowserWindow(QMainWindow):
         root_layout.setSpacing(0)
         central.setStyleSheet(f"QWidget#root {{ background-color: {Theme.bg}; }}")
 
-        root_layout.addWidget(self._create_left_rail())
-        self.left_sidebar = self._create_left_sidebar()
-        self.left_sidebar.setVisible(False)
-        root_layout.addWidget(self.left_sidebar)
         root_layout.addWidget(self._create_center_shell(), 1)
+
+        # F2.6: rail'ler kaldirildi (toggle'lar toolbar'da); paneller icerigi
+        # itmek yerine uzerine kayan glass overlay'lerdir (fan modu deseni).
+        self.left_sidebar_open = False
+        self.right_sidebar_open = False
+        self.left_sidebar = self._create_left_sidebar()
+        self.left_sidebar.setParent(central)
+        self.left_sidebar.setVisible(False)
         self.right_sidebar = self._create_right_sidebar()
+        self.right_sidebar.setParent(central)
         self.right_sidebar.setVisible(False)
-        root_layout.addWidget(self.right_sidebar)
-        root_layout.addWidget(self._create_right_rail())
         return central
+
+    def _position_sidebars(self):
+        """Overlay panelleri pencere boyutuna gore yeniden konumlandirir."""
+        central = self.centralWidget()
+        if not central or not hasattr(self, "left_sidebar"):
+            return
+        height = central.height()
+        lw = self.LEFT_SIDEBAR_WIDTH
+        rw = self.RIGHT_SIDEBAR_WIDTH
+        lx = 0 if self.left_sidebar_open else -lw
+        self.left_sidebar.setGeometry(lx, 0, lw, height)
+        rx = central.width() - rw if self.right_sidebar_open else central.width()
+        self.right_sidebar.setGeometry(rx, 0, rw, height)
+        self.left_sidebar.raise_()
+        self.right_sidebar.raise_()
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        self._position_sidebars()
 
     def _load_ui_state(self):
         state = UiStateStore.load()
@@ -533,93 +555,25 @@ class BrowserWindow(QMainWindow):
             self.permission_mode,
         )
 
-    def _create_left_rail(self):
-        rail = QFrame()
-        rail.setObjectName("leftRail")
-        rail.setFixedWidth(54)
-        rail.setStyleSheet(
-            f"""
-            QFrame#leftRail {{
-                background-color: {Theme.panel};
-                border-right: 1px solid {Theme.border_soft};
-            }}
-            """
-        )
-        layout = QVBoxLayout(rail)
-        layout.setContentsMargins(9, 16, 9, 16)
-        layout.setSpacing(10)
-
-        self.left_toggle_btn = self._rail_button("☰", "Sol paneli aç/kapat")
-        self.left_toggle_btn.clicked.connect(
-            lambda checked=False: self.toggle_left_sidebar()
-        )
-        layout.addWidget(self.left_toggle_btn)
-        layout.addStretch(1)
-        return rail
-
-    def _create_right_rail(self):
-        rail = QFrame()
-        rail.setObjectName("rightRail")
-        rail.setFixedWidth(54)
-        rail.setStyleSheet(
-            f"""
-            QFrame#rightRail {{
-                background-color: {Theme.panel};
-                border-left: 1px solid {Theme.border_soft};
-            }}
-            """
-        )
-        layout = QVBoxLayout(rail)
-        layout.setContentsMargins(9, 16, 9, 16)
-        layout.setSpacing(10)
-
-        self.right_toggle_btn = self._rail_button("▦", "Sekme gruplarını aç/kapat")
-        self.right_toggle_btn.clicked.connect(
-            lambda checked=False: self.toggle_right_sidebar()
-        )
-        layout.addWidget(self.right_toggle_btn)
-        layout.addStretch(1)
-        return rail
-
-    def _rail_button(self, label, tooltip):
-        btn = QPushButton(label)
-        btn.setToolTip(tooltip)
-        btn.setFixedSize(36, 36)
-        btn.setStyleSheet(
-            f"""
-            QPushButton {{
-                border: 1px solid {Theme.border};
-                border-radius: 14px;
-                background-color: {Theme.button};
-                color: {Theme.muted};
-                font-size: 12px;
-                font-weight: 900;
-            }}
-            QPushButton:hover {{
-                background-color: {Theme.purple_soft};
-                color: {Theme.purple};
-            }}
-            """
-        )
-        return btn
-
     def _set_rail_button_active(self, btn, active):
-        bg = Theme.purple_soft if active else Theme.button
+        # F2.6: toolbar'daki panel toggle'lari — aktifken kalici mor zemin.
+        bg = Theme.purple_soft if active else "transparent"
         color = Theme.purple if active else Theme.muted
-        border = "#d9d0ff" if active else Theme.border
+        hover_bg = Theme.purple_soft if active else Theme.panel_alt
+        hover_color = Theme.purple if active else Theme.text
         btn.setStyleSheet(
             f"""
             QPushButton {{
-                border: 1px solid {border};
-                border-radius: 14px;
+                border: none;
+                border-radius: 10px;
                 background-color: {bg};
                 color: {color};
-                font-size: 12px;
-                font-weight: 900;
+                font-size: 13px;
+                font-weight: 800;
             }}
             QPushButton:hover {{
-                background-color: {Theme.purple_soft};
-                color: {Theme.purple};
+                background-color: {hover_bg};
+                color: {hover_color};
             }}
             """
         )
@@ -631,8 +585,6 @@ class BrowserWindow(QMainWindow):
             f"""
             QFrame#centerShell {{
                 background-color: {Theme.panel};
-                border-left: 1px solid {Theme.border_soft};
-                border-right: 1px solid {Theme.border_soft};
             }}
             """
         )
@@ -685,6 +637,13 @@ class BrowserWindow(QMainWindow):
             Theme.SPACE_LG, Theme.SPACE_MD, Theme.SPACE_LG, Theme.SPACE_MD
         )
         layout.setSpacing(Theme.SPACE_SM)
+
+        # F2.6: panel toggle'lari rail yerine toolbar'in iki ucunda.
+        self.left_toggle_btn = self._icon_button("☰", "Sol paneli aç/kapat")
+        self.left_toggle_btn.clicked.connect(
+            lambda checked=False: self.toggle_left_sidebar()
+        )
+        layout.addWidget(self.left_toggle_btn)
 
         for label, callback, tooltip in [
             ("←", self.go_back, "Geri"),
@@ -778,6 +737,12 @@ class BrowserWindow(QMainWindow):
         self._update_profile_chip()
         layout.addWidget(self.profile_chip)
 
+        self.right_toggle_btn = self._icon_button("▦", "Sekme gruplarını aç/kapat")
+        self.right_toggle_btn.clicked.connect(
+            lambda checked=False: self.toggle_right_sidebar()
+        )
+        layout.addWidget(self.right_toggle_btn)
+
         return container
 
     def _toolbar_separator(self):
@@ -841,8 +806,8 @@ class BrowserWindow(QMainWindow):
         sidebar.setStyleSheet(
             f"""
             QFrame#leftSidebar {{
-                background-color: {Theme.panel};
-                border-right: 1px solid {Theme.border_soft};
+                background-color: {Theme.glass_strong};
+                border-right: 1px solid {Theme.glass_border};
             }}
             """
         )
@@ -973,8 +938,8 @@ class BrowserWindow(QMainWindow):
         sidebar.setStyleSheet(
             f"""
             QFrame#rightSidebar {{
-                background-color: {Theme.panel};
-                border-left: 1px solid {Theme.border_soft};
+                background-color: {Theme.glass_strong};
+                border-left: 1px solid {Theme.glass_border};
             }}
             """
         )
@@ -1041,15 +1006,47 @@ class BrowserWindow(QMainWindow):
         if open_state is None:
             open_state = not self.left_sidebar_open
         self.left_sidebar_open = bool(open_state)
-        slide_panel(self.left_sidebar, self.left_sidebar_open, self.LEFT_SIDEBAR_WIDTH)
+        self._slide_overlay_sidebar(self.left_sidebar, "left", self.left_sidebar_open)
         self._set_rail_button_active(self.left_toggle_btn, self.left_sidebar_open)
 
     def toggle_right_sidebar(self, open_state=None):
         if open_state is None:
             open_state = not self.right_sidebar_open
         self.right_sidebar_open = bool(open_state)
-        slide_panel(self.right_sidebar, self.right_sidebar_open, self.RIGHT_SIDEBAR_WIDTH)
+        self._slide_overlay_sidebar(self.right_sidebar, "right", self.right_sidebar_open)
         self._set_rail_button_active(self.right_toggle_btn, self.right_sidebar_open)
+
+    def _slide_overlay_sidebar(self, panel, side, open_state):
+        """Overlay paneli kenardan kaydirir; icerigi itmez, uzerine biner."""
+        central = self.centralWidget()
+        width = (
+            self.LEFT_SIDEBAR_WIDTH if side == "left" else self.RIGHT_SIDEBAR_WIDTH
+        )
+        if side == "left":
+            open_x, closed_x = 0, -width
+        else:
+            open_x, closed_x = central.width() - width, central.width()
+        panel.resize(width, central.height())
+        panel.raise_()
+        if not Motion.enabled:
+            panel.move(open_x if open_state else closed_x, 0)
+            panel.setVisible(open_state)
+            return
+        if open_state:
+            panel.move(closed_x, 0)
+            panel.setVisible(True)
+            animate(
+                panel, b"pos", QPoint(closed_x, 0), QPoint(open_x, 0),
+                duration=Motion.BASE, easing=Motion.ENTER,
+            )
+        else:
+            def _hide():
+                panel.setVisible(False)
+
+            animate(
+                panel, b"pos", panel.pos(), QPoint(closed_x, 0),
+                duration=Motion.BASE, easing=Motion.EXIT, on_finished=_hide,
+            )
 
     def toggle_fan_mode(self):
         """Fan sekme modu: tum sekmelerin snapshot kartlarini overlay'de acar."""

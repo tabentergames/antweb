@@ -4,6 +4,22 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **F2.6 overlay paneller + rail'siz kabuk (2026-07-07, kullanici geri bildirimi:
+  "paneller ekrani daraltiyor"):** 54px sol/sag rail'ler tamamen kaldirildi
+  (`_create_left_rail`/`_create_right_rail`/`_rail_button` silindi); ☰/▦
+  toggle'lari toolbar'in iki ucuna tasindi (`_icon_button` + aktif durum
+  `_set_rail_button_active` mor zemin). Sidebar'lar layout'tan cikti:
+  central'a parent'li glass overlay'ler (FanOverlay ile ayni parent deseni),
+  `_slide_overlay_sidebar` `animate(panel, b"pos", ...)` ile kenardan
+  kaydirir — icerik itilmez. Kritik desenler: (1) overlay'lerin geometrisi
+  `BrowserWindow.resizeEvent` -> `_position_sidebars`'ta kurulur; yeni
+  overlay eklerken oraya kaydet. (2) `slide_panel` (maximumWidth animasyonu)
+  artik KULLANILMIYOR — docked panel kalmadi; yeni overlay'ler pos animasyonu
+  kullanmali. (3) DESIGN_SYSTEM §2 geregi overlay yuzeyler `Theme.glass_strong`
+  + `glass_border`; centerShell'in yan borderlari kaldirildi. (4) Panel
+  acikken ayni taraftaki toolbar toggle'i panelin altinda kalir — kapatma
+  panelin kendi ic × butonuyla yapilir; bu bilincli bir sadelik, scrim/
+  dis-tiklama kapatmasi istenirse FanOverlay'in childAt deseni kullanilabilir.
 - **F2.6 panel yogunluk gecisi tamamlandi (2026-07-07, kullanici onayli tasarim):**
   Sag panel, toolbar ve ayarlar sayfasi sadelestirildi. Kritik desenler:
   (1) `HoverRevealRow` (browser_window.py, dialog siniflarindan sonra) —

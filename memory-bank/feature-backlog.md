@@ -42,6 +42,8 @@ Kullanici geri bildirimiyle acildi (2026-07-07): sag panel/toolbar/ayarlar sadel
 | done | Workspace yatay cipleri | Mor dolgu yalnizca aktif cipte; digerleri hayalet. Silme sag tik menusunde. Elle satir sarma (flow layout yok). |
 | done | Kenarliksiz toolbar ikonlari | `_icon_button` hayalet stil; adres cubugu tek cerceveli eleman. Profil cipi kuculdu (30px, kenarliksiz). |
 | done | Ayarlarda switch bileseni | `.switch-row`/`.switch`/`.knob` CSS + `_switch_row_html` — Hareket ve Gizlilik kartlarindaki durum+eylem pill ciftleri tek anahtara indi. |
+| done | Rail'lerin kaldirilmasi | 54px sol/sag rail'ler silindi; ☰/▦ toggle'lari toolbar'in iki ucunda (`_set_rail_button_active` hayalet stil). Icerik tam genislik kullanir. |
+| done | Overlay paneller | Sol/sag sidebar layout'tan cikti; central'a parent'li glass overlay (`Theme.glass_strong`), `_slide_overlay_sidebar` pos animasyonuyla kenardan kayar, icerigi itmez. `resizeEvent` -> `_position_sidebars`. |
 | todo | Sol panel ayni dile gecis | Sol sidebar bolum basliklari/satirlari henuz eski stilde; ayni yogunluk dili uygulanmali. |
 
 ## F3 - Gizlilik
