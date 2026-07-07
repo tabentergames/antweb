@@ -299,6 +299,21 @@ def run() -> int:
         "favicon tab butonuna uygulanmadi"
     )
 
+    # Context menu — link/secim durumuna gore eylem kumesi degisir.
+    menu = window.current_view._build_context_menu(
+        QUrl("https://example.com/link"), "secili metin"
+    )
+    texts = [a.text() for a in menu.actions() if a.text()]
+    assert any("Geri" in t for t in texts), "context menu Geri yok"
+    assert any("yeni sekmede" in t for t in texts), "linki yeni sekmede ac yok"
+    assert any("Link adresini" in t for t in texts), "link kopyala yok"
+    assert any("Seçimi kopyala" in t for t in texts), "secim kopyala yok"
+    plain_menu = window.current_view._build_context_menu(QUrl(), "")
+    plain_texts = [a.text() for a in plain_menu.actions() if a.text()]
+    assert not any("yeni sekmede" in t for t in plain_texts), "linksiz menude link eylemi var"
+    assert not any("Seçimi kopyala" in t for t in plain_texts), "secimsiz menude kopyala var"
+    assert any("Sayfa adresini" in t for t in plain_texts), "sayfa adresi kopyala yok"
+
     # Sol panel — ozel kisayol ekle/sil.
     window.custom_nav_items.append(("★", "SmokeKisayol"))
     window._render_custom_nav_items()

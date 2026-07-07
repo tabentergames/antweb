@@ -390,9 +390,58 @@ class BrowserTab(QWebEngineView):
 
     def __init__(self, profile=None, parent=None):
         super().__init__(parent)
+        self._shell = parent
         page = TabXPage(profile, self) if profile is not None else TabXPage(self)
         self.setPage(page)
         self._configure_memory_profile()
+
+    def contextMenuEvent(self, event):  # noqa: N802
+        """Native menu yerine TabX temali sag tik menusu."""
+        request = self.lastContextMenuRequest()
+        link_url = request.linkUrl() if request is not None else QUrl()
+        selected = request.selectedText() if request is not None else ""
+        menu = self._build_context_menu(link_url, selected)
+        menu.exec(event.globalPos())
+
+    def _build_context_menu(self, link_url, selected_text):
+        """Menuyu kurar; contextMenuEvent'ten ayri ki smoke test dogrulayabilsin."""
+        menu = QMenu(self)
+        if self._shell is not None and hasattr(self._shell, "_menu_style"):
+            menu.setStyleSheet(self._shell._menu_style())
+
+        back = menu.addAction("←  Geri", self.back)
+        back.setEnabled(self.history().canGoBack())
+        forward = menu.addAction("→  İleri", self.forward)
+        forward.setEnabled(self.history().canGoForward())
+        menu.addAction("↻  Yenile", self.reload)
+
+        if link_url.isValid() and not link_url.isEmpty():
+            menu.addSeparator()
+            if self._shell is not None and hasattr(self._shell, "add_new_tab"):
+                menu.addAction(
+                    "⧉  Linki yeni sekmede aç",
+                    lambda url=QUrl(link_url): self._shell.add_new_tab(url),
+                )
+            menu.addAction(
+                "⎘  Link adresini kopyala",
+                lambda url=QUrl(link_url): QApplication.clipboard().setText(
+                    url.toString()
+                ),
+            )
+
+        if selected_text.strip():
+            menu.addSeparator()
+            menu.addAction(
+                "✂  Seçimi kopyala",
+                lambda: self.pageAction(QWebEnginePage.WebAction.Copy).trigger(),
+            )
+
+        menu.addSeparator()
+        menu.addAction(
+            "⎘  Sayfa adresini kopyala",
+            lambda: QApplication.clipboard().setText(self.url().toString()),
+        )
+        return menu
 
     def _configure_memory_profile(self):
         settings = self.settings()

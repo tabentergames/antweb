@@ -4,6 +4,18 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **Context menu tamamlandi (2026-07-07):** `BrowserTab.contextMenuEvent`
+  override — Qt6'da baglam bilgisi `view.lastContextMenuRequest()`'ten gelir
+  (QWebEngineContextMenuRequest: `linkUrl()`, `selectedText()`); Qt5'teki
+  `page().contextMenuData()` YOK. Kritik desenler: (1) menu kurulumu
+  `_build_context_menu(link_url, selected_text)` olarak AYRI metod — smoke
+  test gercek sag tik olayi uretemedigi icin menuyu dogrudan kurup action
+  metinlerini assert eder; UI olayina bagli her yeni ozellikte bu "kurulumu
+  ayir" desenini koru. (2) `BrowserTab._shell = parent` — kabuga erisim
+  (add_new_tab, _menu_style) icin; BrowserTab hep BrowserWindow parent'iyla
+  kurulur. (3) Secim kopyalama `pageAction(WebAction.Copy).trigger()` ile —
+  clipboard'a manuel yazma degil (webview secimi dogru handle eder).
+  Inspect/devtools eylemi bilincli olarak F6'ya birakildi.
 - **Sekme gruplari calisir + favicon + sol panel F2.6 (2026-07-07, kullanici
   raporu: "grup kayitlari tiklaninca calismiyor"):** Kok neden: veri modeli
   URL tutmuyordu (yalnizca icon+ad). Cozum: (1) ogeler `(icon, ad, URL)`
@@ -202,13 +214,18 @@ Klavye kisayollari ve Downloads tamamlandi. "Temel tarayici yuzeyleri"nde
 kalan dilimler: context menu, sekme favicon'lari, error page. F3'te yalnizca
 site veri temizleme kaldi. Onerilen siradaki is:
 
-Faz: Temel tarayici yuzeyleri | Modul: `core/browser_window.py` (BrowserTab
-sinifi + `_menu_style`) | Kapsam: context menu — geri/ileri/yenile, linki
-yeni sekmede ac, link adresini kopyala, sayfa kaynagi/inspect (ops.).
+Faz: Temel tarayici yuzeyleri | Modul: `core/browser_window.py`
+(`_internal_page_base_css` deseni + `BrowserTab`) | Kapsam: error page —
+ag/DNS/sertifika hatalarinda beyaz Chromium hatasi yerine TabX temali sayfa.
 
-Alternatif kucuk dilim: F2.6'nin kalan `todo`'su — sol sidebar'i ayni
-yogunluk diline gecirmek (bolum etiketleri kucult, satirlara hover-reveal,
-`HoverRevealRow` yeniden kullan).
+Yaklasim: `loadFinished(ok=False)` yakalanip (https_upgrade fallback'iyle
+CAKISMAMALI — once `PrivacyService._on_load_finished` denenir, o URL
+dondurmediyse hata sayfasi goster) `setHtml` ile ic sayfa CSS'ini kullanan
+bir hata sablonu basilir; "Tekrar dene" linki `tabx://` komut deseniyle
+orijinal URL'ye yeniden gider.
+
+Alternatif dilim: F3'un son isi site veri temizleme (clearHttpCache +
+cookieStore().deleteAllCookies(), Gizlilik kartina buton).
 
 Neden:
 
