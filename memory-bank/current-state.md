@@ -20,8 +20,9 @@ Son guncelleme: 2026-07-07
   - Ozel sol kisayol ekleme.
   - Sekme grubu ekleme, aktif sekmeyi gruba kaydetme, grup/kayit silme.
   - `tabx://settings` ve `tabx://about` ic sayfalari.
-  - **F3 — Ad/tracker blocker:** `features/privacy/ad_blocker.py` — QWebEngineUrlRequestInterceptor ile ~50 domain icin subdomain-destekli engelleme.
-  - **F3 — HTTPS upgrade:** `features/privacy/https_upgrade.py` — HTTP isteklerini HTTPS'e yonlendirir; localhost/127.0.0.1 muaf.
+  - **F3 — Ad/tracker blocker:** `features/privacy/ad_blocker.py` — QWebEngineUrlRequestInterceptor ile ~50 domain icin subdomain-destekli engelleme; `set_enabled`/`is_enabled` ile ac/kapat destekler.
+  - **F3 — HTTPS upgrade:** `features/privacy/https_upgrade.py` — HTTP isteklerini HTTPS'e yonlendirir; localhost/127.0.0.1 muaf; `set_enabled` ile ac/kapat destekler.
+  - **F3 — Gizlilik ayar toggle'lari:** `tabx://settings` "Gizlilik" karti — ad blocker ve HTTPS upgrade `PrivacyService.set_ad_block_enabled`/`set_https_upgrade_enabled` uzerinden ac/kapat edilir; tercih `UiStateStore`'da (`ad_block_enabled`, `https_upgrade_enabled`), her profil gecisinde (`_setup_web_profile`) yeniden uygulanir.
   - **F3 — Extension runtime:** `features/extensions/runtime.py` — manifest.json tabanli JS/CSS injection; `data/extensions/` klasorunden yuklenir.
   - F3 bilesenleri `BrowserWindow._setup_privacy_layer()` ile default QWebEngineProfile'a baglanmis durumda.
   - UI state kaydi: `data/ui_state.json`.
@@ -40,7 +41,7 @@ Son guncelleme: 2026-07-07
   - **F4 — History:** `features/library/store.py` (SQLite, `data/library-<profil>.db`); loadFinished'te kayit, `tabx://history` sayfasi + temizleme.
   - **F4 — Bookmarks:** ayni SQLite katmani; toolbar ☆/★ toggle, `tabx://bookmarks` sayfasi + silme.
   - **Toolbar duzeni + profil cipi:** toolbar gezinme | adres | sayfa islemleri | profil olarak ayiricilarla gruplu; az kullanilan eylemler (sekme konumu, ayarlar, hakkinda) `⋯` menusunde. Sag ucta aktif profili gosteren cip: tiklayinca profil gecis menusu (aktif isaretli) + "Yeni profil…". `_menu_style()` QMenu'ler icin ortak token-bazli stil.
-  - **tabx:// yonlendirme:** `TabXPage.acceptNavigationRequest` ic linkleri sinyalle kabuga tasir (`_handle_internal_url`); komut linkleri: `history/clear`, `bookmarks/remove?id=`, `settings/profile?name=`, `settings/profile-new`, `settings/reduced-motion`.
+  - **tabx:// yonlendirme:** `TabXPage.acceptNavigationRequest` ic linkleri sinyalle kabuga tasir (`_handle_internal_url`); komut linkleri: `history/clear`, `bookmarks/remove?id=`, `settings/profile?name=`, `settings/profile-new`, `settings/reduced-motion`, `settings/ad-block`, `settings/https-upgrade`.
   - **F2.5 reduced-motion ayari:** `tabx://settings` "Hareket" karti — `toggle_reduced_motion()` `Motion.configure` cagirir, `UiStateStore`'a `reduced_motion` alanini yazar; `BrowserWindow.__init__` acilista `Theme.configure` sonrasi `Motion.configure(not self.reduced_motion)` ile tercihi uygular.
   - **F2.5 glass yuzey gecisi:** `TextInputDialog`/`ConfirmDialog` arka plani `Theme.panel` yerine `Theme.glass_strong` + kenarlik `Theme.glass_border`; offscreen render ile pixel/alfa dogrulandi (light+dark). Sidebar/rail/tab-strip docked yuzeyler oldugundan kapsam disi (DESIGN_SYSTEM §2 yalnizca floating/overlay yuzeyleri kapsiyor); toolbar zaten `Theme.toolbar` yari saydam tokenini kullaniyor.
 
@@ -49,7 +50,7 @@ Son guncelleme: 2026-07-07
 - `core/browser_window.py` hala sidebar, dialogs ve internal page HTML'lerini iceriyor; F2'nin kritik tema/tab parcalari ayrildi.
 - `assets/`, `tests/` hedef klasorleri henuz kurulmus degil.
 - Fan sekme modu yok; F2 tamamlanma kriteri esnek sekme konumu ile karsilandi.
-- F3 gizlilik ozellikleri calisir durumda; ancak ayarlar sayfasinda toggle UI'i yok.
+- F3 gizlilik ozelliklerinin ac/kapat toggle'lari var; izin paneli (kamera/mikrofon/konum/bildirim) ve site verisi temizleme hala yok.
 - Downloads, context menu, klavye kisayollari ve error page yok (bkz. backlog "Temel tarayici yuzeyleri").
 - History'de arama/filtre, bookmark'ta etiket/klasor yok; ilk dilim bilincli olarak sade.
 - Test paketi olarak yalnizca `scripts/smoke_test.py` var; `tests/` altinda state-store ve motion testleri eklenmeli.

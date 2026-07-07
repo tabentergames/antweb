@@ -4,6 +4,19 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **F3 gizlilik ayar toggle'lari tamamlandi (2026-07-07):** `tabx://settings`
+  "Gizlilik" karti — ad blocker ve HTTPS upgrade icin ayri ac/kapat pill'leri
+  (`tabx://settings/ad-block`, `tabx://settings/https-upgrade` komut linkleri,
+  `reduced-motion` ile ayni desen: `_handle_internal_url` -> `toggle_*()` ->
+  `_load_internal_page(view, "settings")`). Kritik desenler: (1) `AdBlockInterceptor`
+  onceden `is_enabled()` sabit `True` donduruyordu (yorum: "future: wire to
+  settings toggle") — artik `_enabled`/`set_enabled` ekli; `HttpsUpgradeInterceptor`
+  zaten `set_enabled` iceriyordu, degismedi. (2) `PrivacyService`'e
+  `set_ad_block_enabled`/`set_https_upgrade_enabled` convenience metodlari
+  eklendi. (3) Toggle'lar GLOBAL tercih (`UiStateStore`'da `theme_mode`/
+  `reduced_motion` ile ayni seviyede, profil bazli DEGIL); `_setup_web_profile`
+  her profil olusturuldugunda/degistirildiginde persisted degeri yeni
+  `PrivacyService`'e yeniden uygular — profil gecisinde toggle sifirlanmiyor.
 - **F2.5 glass yuzey gecisi tamamlandi (2026-07-07):** `TextInputDialog._dialog_style`
   ve `ConfirmDialog.__init__` icindeki `background-color: Theme.panel` ->
   `Theme.glass_strong` + `border: 1px solid Theme.glass_border` (FanOverlay ile
@@ -85,36 +98,36 @@ Son guncelleme: 2026-07-07
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-F2.5'in glass yuzey gecisi ve reduced-motion ayari tamamlandi; backlog'ta F2.5
-altinda yalnizca `todo` dilimler kaldi (cikis/giris sayfa gecisi, frameless
-kabuk arastirmasi) — ikisi de dusuk oncelikli/arastirma agirlikli. Bunun
-yerine kullanici yuzeyi acisindan daha degerli olan F3/Temel tarayici
-yuzeyleri fazlarindan birine gecilmesi onerilir:
+F2.5 (motion+glass) ve F3'un ayar toggle dilimi tamamlandi. Backlog'ta F3
+altinda tek `next` kalan is izin paneli; bu, kalan F2.5 arastirma gorevlerinden
+(cikis/giris sayfa gecisi, frameless kabuk) ve F3 site-veri-temizlemeden daha
+somut/degerli. Alternatif olarak "Temel tarayici yuzeyleri" altindaki Downloads
+sayfasi da hazir; ikisi bagimsiz dosyalarda oldugu icin paralel yurutulebilir.
 
-Faz: F3 | Modul: `features/privacy`, `core/browser_window.py` (`_settings_page_html`) |
-Kapsam: adblock/HTTPS upgrade toggle'larini `tabx://settings` yuzeyine baglama;
-state `data/ui_state.json`'da.
+Faz: F3 | Modul: `features/privacy` (yeni `permissions.py`?), `core/browser_window.py`
+(`_setup_web_profile`, `_settings_page_html`) | Kapsam: izin paneli — kamera,
+mikrofon, konum, bildirim izinleri.
 
 Neden:
 
-- F3 gizlilik ozellikleri (ad_blocker, https_upgrade) calisir durumda ama
-  kullanicinin kapatma/acma sansi yok — mevcut teknik borc listesinde acikca
-  belirtilmis.
-- Komut linki deseni hazir: bu oturumda eklenen `tabx://settings/reduced-motion`
-  ve daha once eklenen `settings/profile?name=` ayni desenin ucuncu/dorduncu
-  ornegi olur (`_handle_internal_url` icine yeni `if key == "settings" and
-  action == "..."` dali + `UiStateStore`'a yeni alan).
+- QWebEngineProfile zaten `featurePermissionRequested` sinyali sunar; su an
+  hicbir yerde baglanmamis — izinler varsayilan (muhtemelen otomatik reddedilen
+  veya native prompt'a dusen) Chromium davranisina birakilmis.
+- Ad-block/HTTPS toggle deseni (global tercih + `tabx://settings` komut linki +
+  `UiStateStore` alani + profil gecisinde yeniden uygulama) dogrudan tasinabilir.
 
 Net teslim kriteri:
 
-- `tabx://settings` "Gizlilik" kartinda ad blocker ve HTTPS upgrade icin ayri
-  toggle'lar; durumlari `data/ui_state.json`'a yazilir, acilista
-  `PrivacyService`'e uygulanir.
+- `QWebEngineProfile.featurePermissionRequested` sinyaline baglanan bir handler;
+  kullaniciya sor/otomatik izin ver/otomatik reddet secenekleri en az per-tur
+  (host bazli hatirlama sonraki dilim olabilir).
+- `tabx://settings` icinde izin davranisini gosteren/degistiren bir kart.
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
 
-Paralel yurutulebilir ikinci gorev (farkli yuzey): "Temel tarayici yuzeyleri"
-altindan `next` isaretli Downloads sayfasi (indirme listesi, duraklat/devam,
-klasorde goster) — F3'ten bagimsiz dosyalar (`features/` altinda yeni modul).
+Paralel yurutulebilir ikinci gorev (farkli dosyalar, `features/` altinda yeni
+modul): Downloads sayfasi — `QWebEngineProfile.downloadRequested` sinyaline
+baglanma, indirme listesi, duraklat/devam, klasorde goster. "Temel tarayici
+yuzeyleri" tablosunda `next` olarak isaretli.
 
 ## Teslim notu formati
 

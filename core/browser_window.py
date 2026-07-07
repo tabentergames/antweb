@@ -53,6 +53,8 @@ class UiStateStore:
         "theme_mode": "light",
         "tab_position": "top",
         "reduced_motion": False,
+        "ad_block_enabled": True,
+        "https_upgrade_enabled": True,
         "profile": "default",
         "profiles": ["default"],
         "custom_nav_items": [],
@@ -88,6 +90,10 @@ class UiStateStore:
                 state["tab_position"] = loaded["tab_position"]
             if isinstance(loaded.get("reduced_motion"), bool):
                 state["reduced_motion"] = loaded["reduced_motion"]
+            if isinstance(loaded.get("ad_block_enabled"), bool):
+                state["ad_block_enabled"] = loaded["ad_block_enabled"]
+            if isinstance(loaded.get("https_upgrade_enabled"), bool):
+                state["https_upgrade_enabled"] = loaded["https_upgrade_enabled"]
             profiles = [
                 str(p).strip()
                 for p in loaded.get("profiles", [])
@@ -118,6 +124,8 @@ class UiStateStore:
         profile="default",
         profiles=None,
         reduced_motion=False,
+        ad_block_enabled=True,
+        https_upgrade_enabled=True,
     ):
         cls.state_path.parent.mkdir(parents=True, exist_ok=True)
         profiles = [str(p) for p in (profiles or ["default"])] or ["default"]
@@ -125,6 +133,8 @@ class UiStateStore:
             "theme_mode": "dark" if theme_mode == "dark" else "light",
             "tab_position": "bottom" if tab_position == "bottom" else "top",
             "reduced_motion": bool(reduced_motion),
+            "ad_block_enabled": bool(ad_block_enabled),
+            "https_upgrade_enabled": bool(https_upgrade_enabled),
             "profile": profile if profile in profiles else profiles[0],
             "profiles": profiles,
             "custom_nav_items": [
@@ -365,6 +375,8 @@ class BrowserWindow(QMainWindow):
         profile.setCachePath(str(data_dir / "cache"))
         self.web_profile = profile
         self.privacy = PrivacyService(profile)
+        self.privacy.set_ad_block_enabled(self.ad_block_enabled)
+        self.privacy.set_https_upgrade_enabled(self.https_upgrade_enabled)
         self.history = HistoryStore(self.profile_name)
         self.bookmarks = BookmarkStore(self.profile_name)
         self.workspace = SessionStore.active_workspace(self.profile_name)
@@ -435,6 +447,8 @@ class BrowserWindow(QMainWindow):
         self.theme_mode = state.get("theme_mode", "light")
         self.tab_position = state.get("tab_position", "top")
         self.reduced_motion = bool(state.get("reduced_motion", False))
+        self.ad_block_enabled = bool(state.get("ad_block_enabled", True))
+        self.https_upgrade_enabled = bool(state.get("https_upgrade_enabled", True))
         self.profiles = state.get("profiles", ["default"])
         self.profile_name = state.get("profile", self.profiles[0])
         self.custom_nav_items = [
@@ -471,6 +485,8 @@ class BrowserWindow(QMainWindow):
             self.profile_name,
             self.profiles,
             self.reduced_motion,
+            self.ad_block_enabled,
+            self.https_upgrade_enabled,
         )
 
     def _create_left_rail(self):
@@ -1035,6 +1051,16 @@ class BrowserWindow(QMainWindow):
     def toggle_reduced_motion(self):
         self.reduced_motion = not self.reduced_motion
         Motion.configure(not self.reduced_motion)
+        self._save_ui_state()
+
+    def toggle_ad_block(self):
+        self.ad_block_enabled = not self.ad_block_enabled
+        self.privacy.set_ad_block_enabled(self.ad_block_enabled)
+        self._save_ui_state()
+
+    def toggle_https_upgrade(self):
+        self.https_upgrade_enabled = not self.https_upgrade_enabled
+        self.privacy.set_https_upgrade_enabled(self.https_upgrade_enabled)
         self._save_ui_state()
 
     # ------------------------------------------------------------------
@@ -1725,6 +1751,14 @@ class BrowserWindow(QMainWindow):
             self.toggle_reduced_motion()
             self._load_internal_page(view, "settings")
             return
+        if key == "settings" and action == "ad-block":
+            self.toggle_ad_block()
+            self._load_internal_page(view, "settings")
+            return
+        if key == "settings" and action == "https-upgrade":
+            self.toggle_https_upgrade()
+            self._load_internal_page(view, "settings")
+            return
         self._load_internal_page(view, key)
 
     def _record_history(self, ok, view):
@@ -1885,6 +1919,10 @@ class BrowserWindow(QMainWindow):
         motion_action_label = (
             "Animasyonları aç" if self.reduced_motion else "Animasyonları azalt"
         )
+        ad_block_label = "Ad/tracker blocker açık" if self.ad_block_enabled else "Ad/tracker blocker kapalı"
+        ad_block_action_label = "Kapat" if self.ad_block_enabled else "Aç"
+        https_upgrade_label = "HTTPS upgrade açık" if self.https_upgrade_enabled else "HTTPS upgrade kapalı"
+        https_upgrade_action_label = "Kapat" if self.https_upgrade_enabled else "Aç"
         profile_pills = []
         for name in self.profiles:
             safe = html_module.escape(name, quote=True)
@@ -1950,7 +1988,15 @@ class BrowserWindow(QMainWindow):
               </article>
               <article class="card">
                 <h2>Gizlilik</h2>
-                <p>Ad/tracker blocker, HTTPS upgrade, izinler ve site verisi temizleme F3 içinde bağlanacak.</p>
+                <p>Ad/tracker blocker ve HTTPS upgrade burada aç/kapat edilir; izinler ve site verisi temizleme sonraki dilim.</p>
+                <div class="pill-row">
+                  <span class="pill status">{ad_block_label}</span>
+                  <a class="pill" style="text-decoration:none;" href="tabx://settings/ad-block">{ad_block_action_label}</a>
+                </div>
+                <div class="pill-row">
+                  <span class="pill status">{https_upgrade_label}</span>
+                  <a class="pill" style="text-decoration:none;" href="tabx://settings/https-upgrade">{https_upgrade_action_label}</a>
+                </div>
               </article>
               <article class="card">
                 <h2>Arama</h2>

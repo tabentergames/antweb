@@ -53,6 +53,12 @@ class PrivacyService:
         """Connect a new tab's loadFinished signal to the HTTPS fallback handler."""
         view.loadFinished.connect(lambda ok, v=view: self._on_load_finished(ok, v))
 
+    def set_ad_block_enabled(self, enabled: bool) -> None:
+        self.ad_blocker.set_enabled(enabled)
+
+    def set_https_upgrade_enabled(self, enabled: bool) -> None:
+        self.https_interceptor.set_enabled(enabled)
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------

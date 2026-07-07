@@ -87,6 +87,25 @@ def run() -> int:
     assert UiStateStore.load()["reduced_motion"] is False, "reduced_motion kalici state geri yazilmadi"
     Motion.configure(False)
 
+    # F3 — ad block / https upgrade ayarlari: toggle + tabx://settings komut linki + kalicilik.
+    assert window.ad_block_enabled is True, "varsayilan ad_block_enabled True olmali"
+    assert window.privacy.ad_blocker.is_enabled() is True, "ad blocker varsayilani acik degil"
+    window.toggle_ad_block()
+    assert window.ad_block_enabled is False, "ad block kapanmadi"
+    assert window.privacy.ad_blocker.is_enabled() is False, "ad blocker servise yansimadi"
+    assert UiStateStore.load()["ad_block_enabled"] is False, "ad_block_enabled kalici state'e yazilmadi"
+    window._handle_internal_url(window.current_view, QUrl("tabx://settings/ad-block"))
+    assert window.ad_block_enabled is True, "settings komutu ad block'u geri acmadi"
+    assert window.privacy.ad_blocker.is_enabled() is True, "ad blocker servise geri yansimadi"
+
+    assert window.https_upgrade_enabled is True, "varsayilan https_upgrade_enabled True olmali"
+    window.toggle_https_upgrade()
+    assert window.https_upgrade_enabled is False, "https upgrade kapanmadi"
+    assert UiStateStore.load()["https_upgrade_enabled"] is False, "https_upgrade_enabled kalici state'e yazilmadi"
+    window._handle_internal_url(window.current_view, QUrl("tabx://settings/https-upgrade"))
+    assert window.https_upgrade_enabled is True, "settings komutu https upgrade'i geri acmadi"
+    assert UiStateStore.load()["https_upgrade_enabled"] is True, "https_upgrade_enabled kalici state geri yazilmadi"
+
     # F2.5 — tab strip ekle/kapat: once reduced-motion yolu (deterministik).
     before = window.tabs.count()
     window.add_new_tab()

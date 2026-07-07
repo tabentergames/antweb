@@ -72,6 +72,7 @@ class AdBlockInterceptor(QWebEngineUrlRequestInterceptor):
         if extra_domains:
             self._blocked.update(extra_domains)
         self._blocked_count = 0
+        self._enabled = True
 
     # ------------------------------------------------------------------
     # Public API
@@ -104,8 +105,11 @@ class AdBlockInterceptor(QWebEngineUrlRequestInterceptor):
         """Cumulative number of requests blocked since startup."""
         return self._blocked_count
 
+    def set_enabled(self, enabled: bool) -> None:
+        self._enabled = enabled
+
     def is_enabled(self) -> bool:
-        return True  # future: wire to settings toggle
+        return self._enabled
 
     # ------------------------------------------------------------------
     # QWebEngineUrlRequestInterceptor override

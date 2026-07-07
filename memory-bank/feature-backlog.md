@@ -38,7 +38,8 @@ Kurallar: `docs/DESIGN_SYSTEM.md`. Motion altyapisina dokunan isler SIRALI yurut
 | done | TabX eklenti runtime | features/extensions/runtime.py — manifest.json + JS/CSS injection. |
 | done | Temel ad/tracker blocker | features/privacy/ad_blocker.py — ~50 domain, subdomain destekli. |
 | done | HTTPS upgrade | features/privacy/https_upgrade.py — HTTP→HTTPS redirect, localhost muaf. |
-| todo | Izin paneli | Kamera, mikrofon, konum, bildirim izinleri. |
+| done | Ayar sayfasi toggle'lari | `tabx://settings` "Gizlilik" karti — ad blocker ve HTTPS upgrade icin ac/kapat, `data/ui_state.json`'a yazilir, profil gecisinde/acilista uygulanir. |
+| next | Izin paneli | Kamera, mikrofon, konum, bildirim izinleri. |
 | todo | Site veri temizleme | Cache/cookie/local storage temizleme UI'i. |
 
 ## F4 - Profil & Workspace
