@@ -55,6 +55,7 @@ class UiStateStore:
         "reduced_motion": False,
         "ad_block_enabled": True,
         "https_upgrade_enabled": True,
+        "permission_mode": "ask",
         "profile": "default",
         "profiles": ["default"],
         "custom_nav_items": [],
@@ -94,6 +95,8 @@ class UiStateStore:
                 state["ad_block_enabled"] = loaded["ad_block_enabled"]
             if isinstance(loaded.get("https_upgrade_enabled"), bool):
                 state["https_upgrade_enabled"] = loaded["https_upgrade_enabled"]
+            if loaded.get("permission_mode") in {"ask", "allow", "block"}:
+                state["permission_mode"] = loaded["permission_mode"]
             profiles = [
                 str(p).strip()
                 for p in loaded.get("profiles", [])
@@ -126,6 +129,7 @@ class UiStateStore:
         reduced_motion=False,
         ad_block_enabled=True,
         https_upgrade_enabled=True,
+        permission_mode="ask",
     ):
         cls.state_path.parent.mkdir(parents=True, exist_ok=True)
         profiles = [str(p) for p in (profiles or ["default"])] or ["default"]
@@ -135,6 +139,7 @@ class UiStateStore:
             "reduced_motion": bool(reduced_motion),
             "ad_block_enabled": bool(ad_block_enabled),
             "https_upgrade_enabled": bool(https_upgrade_enabled),
+            "permission_mode": permission_mode if permission_mode in {"ask", "allow", "block"} else "ask",
             "profile": profile if profile in profiles else profiles[0],
             "profiles": profiles,
             "custom_nav_items": [
@@ -252,7 +257,7 @@ class TextInputDialog(QDialog):
 class ConfirmDialog(QDialog):
     """Light themed confirmation dialog."""
 
-    def __init__(self, title, message, parent=None):
+    def __init__(self, title, message, parent=None, cancel_label="Vazgeç", confirm_label="Sil"):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -284,17 +289,18 @@ class ConfirmDialog(QDialog):
 
         actions = QHBoxLayout()
         actions.addStretch(1)
-        cancel = TextInputDialog._dialog_button(self, "Vazgeç", primary=False)
+        cancel = TextInputDialog._dialog_button(self, cancel_label, primary=False)
         cancel.clicked.connect(self.reject)
-        confirm = TextInputDialog._dialog_button(self, "Sil", primary=True)
+        confirm = TextInputDialog._dialog_button(self, confirm_label, primary=True)
         confirm.clicked.connect(self.accept)
         actions.addWidget(cancel)
         actions.addWidget(confirm)
         layout.addLayout(actions)
 
     @classmethod
-    def ask(cls, parent, title, message):
-        return cls(title, message, parent).exec() == QDialog.DialogCode.Accepted
+    def ask(cls, parent, title, message, cancel_label="Vazgeç", confirm_label="Sil"):
+        dialog = cls(title, message, parent, cancel_label=cancel_label, confirm_label=confirm_label)
+        return dialog.exec() == QDialog.DialogCode.Accepted
 
 
 class TabXPage(QWebEnginePage):
@@ -449,6 +455,7 @@ class BrowserWindow(QMainWindow):
         self.reduced_motion = bool(state.get("reduced_motion", False))
         self.ad_block_enabled = bool(state.get("ad_block_enabled", True))
         self.https_upgrade_enabled = bool(state.get("https_upgrade_enabled", True))
+        self.permission_mode = state.get("permission_mode", "ask")
         self.profiles = state.get("profiles", ["default"])
         self.profile_name = state.get("profile", self.profiles[0])
         self.custom_nav_items = [
@@ -487,6 +494,7 @@ class BrowserWindow(QMainWindow):
             self.reduced_motion,
             self.ad_block_enabled,
             self.https_upgrade_enabled,
+            self.permission_mode,
         )
 
     def _create_left_rail(self):
@@ -1063,6 +1071,47 @@ class BrowserWindow(QMainWindow):
         self.privacy.set_https_upgrade_enabled(self.https_upgrade_enabled)
         self._save_ui_state()
 
+    def set_permission_mode(self, mode):
+        if mode not in {"ask", "allow", "block"} or mode == self.permission_mode:
+            return
+        self.permission_mode = mode
+        self._save_ui_state()
+
+    _PERMISSION_TYPE_LABELS = {
+        "Geolocation": "konum",
+        "MediaAudioCapture": "mikrofon",
+        "MediaVideoCapture": "kamera",
+        "MediaAudioVideoCapture": "kamera ve mikrofon",
+        "Notifications": "bildirim",
+    }
+
+    def _handle_permission_request(self, permission):
+        """QWebEnginePage.permissionRequested icin merkezi karar noktasi."""
+        if self.permission_mode == "allow":
+            permission.grant()
+            return
+        if self.permission_mode == "block":
+            permission.deny()
+            return
+        origin = permission.origin().host() or permission.origin().toString()
+        label = self._PERMISSION_TYPE_LABELS.get(
+            permission.permissionType().name, "bu ozellik"
+        )
+        granted = self._confirm_permission(origin, label)
+        if granted:
+            permission.grant()
+        else:
+            permission.deny()
+
+    def _confirm_permission(self, origin, label):
+        return ConfirmDialog.ask(
+            self,
+            "İzin isteği",
+            f"{origin} sitesi {label} erişimi istiyor. İzin verilsin mi?",
+            cancel_label="Reddet",
+            confirm_label="İzin ver",
+        )
+
     # ------------------------------------------------------------------
     # F4 — profil ve workspace
     # ------------------------------------------------------------------
@@ -1513,6 +1562,7 @@ class BrowserWindow(QMainWindow):
         new_view.page().internalUrlRequested.connect(
             lambda internal_url, view=new_view: self._handle_internal_url(view, internal_url)
         )
+        new_view.page().permissionRequested.connect(self._handle_permission_request)
         self.privacy.attach_tab(new_view)
 
         index = self.tabs.add_tab(url, title)
@@ -1759,6 +1809,10 @@ class BrowserWindow(QMainWindow):
             self.toggle_https_upgrade()
             self._load_internal_page(view, "settings")
             return
+        if key == "settings" and action == "permission-mode":
+            self.set_permission_mode(query.queryItemValue("value").strip())
+            self._load_internal_page(view, "settings")
+            return
         self._load_internal_page(view, key)
 
     def _record_history(self, ok, view):
@@ -1923,6 +1977,21 @@ class BrowserWindow(QMainWindow):
         ad_block_action_label = "Kapat" if self.ad_block_enabled else "Aç"
         https_upgrade_label = "HTTPS upgrade açık" if self.https_upgrade_enabled else "HTTPS upgrade kapalı"
         https_upgrade_action_label = "Kapat" if self.https_upgrade_enabled else "Aç"
+        permission_options = [
+            ("ask", "Her seferinde sor"),
+            ("allow", "Her zaman izin ver"),
+            ("block", "Her zaman reddet"),
+        ]
+        permission_pills = []
+        for value, text in permission_options:
+            if value == self.permission_mode:
+                permission_pills.append(f'<span class="pill status">{text} ✓</span>')
+            else:
+                permission_pills.append(
+                    f'<a class="pill" style="text-decoration:none;" '
+                    f'href="tabx://settings/permission-mode?value={value}">{text}</a>'
+                )
+        permission_pills_html = "".join(permission_pills)
         profile_pills = []
         for name in self.profiles:
             safe = html_module.escape(name, quote=True)
@@ -1997,6 +2066,11 @@ class BrowserWindow(QMainWindow):
                   <span class="pill status">{https_upgrade_label}</span>
                   <a class="pill" style="text-decoration:none;" href="tabx://settings/https-upgrade">{https_upgrade_action_label}</a>
                 </div>
+              </article>
+              <article class="card">
+                <h2>İzinler</h2>
+                <p>Kamera, mikrofon, konum ve bildirim istekleri için varsayılan davranış.</p>
+                <div class="pill-row">{permission_pills_html}</div>
               </article>
               <article class="card">
                 <h2>Arama</h2>

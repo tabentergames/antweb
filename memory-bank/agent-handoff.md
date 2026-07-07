@@ -4,6 +4,23 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **F3 izin paneli tamamlandi (2026-07-07):** `QWebEnginePermission` tabanli
+  YENI Qt 6.8+ API kullanildi (`page().permissionRequested(QWebEnginePermission)`),
+  eski `featurePermissionRequested`/`setFeaturePermission`/`Feature` enum'u
+  DEGIL — PyQt6-WebEngine 6.10 kurulu, yeni API onerilen yol. Karar tek bir
+  global `permission_mode` ("ask"/"allow"/"block") uzerinden veriliyor; per-origin
+  hatirlama (`QWebEnginePermission.isPersistent`/`grant()` kalici mi) YOK,
+  bilincli sadelestirme — sonraki dilim istenirse eklenebilir. Kritik desenler:
+  (1) `_handle_permission_request` her yeni sekmede `add_new_tab` icinde
+  `page().permissionRequested.connect(self._handle_permission_request)` ile
+  baglaniyor (view'a ozel degil, dogrudan window metoduna); (2) "ask" modunda
+  gercek karar `_confirm_permission()` adli AYRI bir metotta — bunu smoke
+  test'te modal `ConfirmDialog.exec()`'i tetiklemeden monkeypatch'lemek icin
+  boyle ayirdim, dogrudan `_handle_permission_request` icine gomulu olsaydi
+  test edilemezdi; benzer "kullanici etkilesimi gerektiren karar" ekleyen
+  agent'lar bu ayirma desenini kullanmali. (3) `ConfirmDialog` artik
+  `cancel_label`/`confirm_label` parametreli (varsayilan "Vazgeç"/"Sil",
+  eski cagrilar bozulmadi) — izin dialogu "Reddet"/"İzin ver" kullaniyor.
 - **F3 gizlilik ayar toggle'lari tamamlandi (2026-07-07):** `tabx://settings`
   "Gizlilik" karti — ad blocker ve HTTPS upgrade icin ayri ac/kapat pill'leri
   (`tabx://settings/ad-block`, `tabx://settings/https-upgrade` komut linkleri,
@@ -98,36 +115,38 @@ Son guncelleme: 2026-07-07
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-F2.5 (motion+glass) ve F3'un ayar toggle dilimi tamamlandi. Backlog'ta F3
-altinda tek `next` kalan is izin paneli; bu, kalan F2.5 arastirma gorevlerinden
-(cikis/giris sayfa gecisi, frameless kabuk) ve F3 site-veri-temizlemeden daha
-somut/degerli. Alternatif olarak "Temel tarayici yuzeyleri" altindaki Downloads
-sayfasi da hazir; ikisi bagimsiz dosyalarda oldugu icin paralel yurutulebilir.
+F3'un tum `next`/`todo` dilimlerinden yalnizca "Site veri temizleme" kaldi;
+F2.5'te de yalnizca dusuk oncelikli arastirma gorevleri (cikis/giris sayfa
+gecisi, frameless kabuk) var. En degerli somut is artik "Temel tarayici
+yuzeyleri" tablosunda `next` isaretli Downloads sayfasi:
 
-Faz: F3 | Modul: `features/privacy` (yeni `permissions.py`?), `core/browser_window.py`
-(`_setup_web_profile`, `_settings_page_html`) | Kapsam: izin paneli — kamera,
-mikrofon, konum, bildirim izinleri.
+Faz: Temel tarayici yuzeyleri | Modul: `features/downloads/` (yeni), `core/browser_window.py`
+(`_setup_web_profile`, `_settings_page_html` veya yeni `tabx://downloads` route'u) |
+Kapsam: indirme listesi, duraklat/devam, klasorde goster.
 
 Neden:
 
-- QWebEngineProfile zaten `featurePermissionRequested` sinyali sunar; su an
-  hicbir yerde baglanmamis — izinler varsayilan (muhtemelen otomatik reddedilen
-  veya native prompt'a dusen) Chromium davranisina birakilmis.
-- Ad-block/HTTPS toggle deseni (global tercih + `tabx://settings` komut linki +
-  `UiStateStore` alani + profil gecisinde yeniden uygulama) dogrudan tasinabilir.
+- `QWebEngineProfile.downloadRequested(QWebEngineDownloadRequest)` sinyali su an
+  hicbir yerde baglanmamis; varsayilan Chromium davranisi (indirmeyi sessizce
+  reddetmesi ya da native OS dialogu) kullaniciya kontrol vermiyor.
+- History/Bookmarks deseni (SQLite store + `tabx://` ic sayfa + komut linki)
+  buraya da tasinabilir; izin panelindeki "yeni sinyale baglan + tabx sayfasi"
+  deseni de taze ornek.
 
 Net teslim kriteri:
 
-- `QWebEngineProfile.featurePermissionRequested` sinyaline baglanan bir handler;
-  kullaniciya sor/otomatik izin ver/otomatik reddet secenekleri en az per-tur
-  (host bazli hatirlama sonraki dilim olabilir).
-- `tabx://settings` icinde izin davranisini gosteren/degistiren bir kart.
+- Her profil kurulumunda (`_setup_web_profile`) `downloadRequested`'a baglanan
+  bir handler; indirmeyi `accept()`'ler ve hedef klasoru/ilerlemeyi izler.
+- `tabx://downloads` ic sayfasi: liste, durum (devam ediyor/tamamlandi/basarisiz),
+  "klasorde goster" komut linki.
+- Toolbar'da indirme aktifken/tamamlaninca fark edilir bir gosterge (ops.).
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
 
-Paralel yurutulebilir ikinci gorev (farkli dosyalar, `features/` altinda yeni
-modul): Downloads sayfasi — `QWebEngineProfile.downloadRequested` sinyaline
-baglanma, indirme listesi, duraklat/devam, klasorde goster. "Temel tarayici
-yuzeyleri" tablosunda `next` olarak isaretli.
+Paralel yurutulebilir ikinci gorev (farkli dosyalar): F3 | Modul:
+`core/browser_window.py` (`_settings_page_html`, yeni sayfa) | Kapsam: site
+verisi temizleme — cache/cookie/local storage icin `QWebEngineProfile.clearHttpCache()`
+ve `profile.cookieStore().deleteAllCookies()` gibi API'lere baglanan bir buton;
+"Gizlilik" kartina veya ayri bir alt bolume eklenebilir.
 
 ## Teslim notu formati
 

@@ -106,6 +106,71 @@ def run() -> int:
     assert window.https_upgrade_enabled is True, "settings komutu https upgrade'i geri acmadi"
     assert UiStateStore.load()["https_upgrade_enabled"] is True, "https_upgrade_enabled kalici state geri yazilmadi"
 
+    # F3 — izin paneli: allow/block otomatik karar verir, ask -> _confirm_permission'a duser.
+    class _FakePermissionType:
+        def __init__(self, name):
+            self.name = name
+
+    class _FakeOrigin:
+        def __init__(self, host):
+            self._host = host
+
+        def host(self):
+            return self._host
+
+        def toString(self):
+            return self._host
+
+    class _FakePermission:
+        def __init__(self, host, type_name):
+            self._origin = _FakeOrigin(host)
+            self._type = _FakePermissionType(type_name)
+            self.decision = None
+
+        def origin(self):
+            return self._origin
+
+        def permissionType(self):
+            return self._type
+
+        def grant(self):
+            self.decision = "granted"
+
+        def deny(self):
+            self.decision = "denied"
+
+    assert window.permission_mode == "ask", "varsayilan permission_mode ask olmali"
+
+    window.set_permission_mode("allow")
+    assert UiStateStore.load()["permission_mode"] == "allow", "permission_mode kalici state'e yazilmadi"
+    perm = _FakePermission("example.com", "Geolocation")
+    window._handle_permission_request(perm)
+    assert perm.decision == "granted", "allow modunda izin otomatik verilmedi"
+
+    window.set_permission_mode("block")
+    perm = _FakePermission("example.com", "MediaVideoCapture")
+    window._handle_permission_request(perm)
+    assert perm.decision == "denied", "block modunda izin otomatik reddedilmedi"
+
+    window.set_permission_mode("ask")
+    original_confirm = window._confirm_permission
+    window._confirm_permission = lambda origin, label: True
+    perm = _FakePermission("example.com", "Notifications")
+    window._handle_permission_request(perm)
+    assert perm.decision == "granted", "ask modunda onaylanan istek verilmedi"
+
+    window._confirm_permission = lambda origin, label: False
+    perm = _FakePermission("example.com", "MediaAudioCapture")
+    window._handle_permission_request(perm)
+    assert perm.decision == "denied", "ask modunda reddedilen istek engellenmedi"
+    window._confirm_permission = original_confirm
+
+    window._handle_internal_url(
+        window.current_view, QUrl("tabx://settings/permission-mode?value=allow")
+    )
+    assert window.permission_mode == "allow", "settings komutu permission_mode degistirmedi"
+    window.set_permission_mode("ask")
+
     # F2.5 — tab strip ekle/kapat: once reduced-motion yolu (deterministik).
     before = window.tabs.count()
     window.add_new_tab()
