@@ -15,18 +15,21 @@ class TabButton(QFrame):
 
     MIN_WIDTH = 144
 
-    def __init__(self, title="Yeni Sekme", active=False, closable=True, parent=None):
+    def __init__(self, title="Yeni Sekme", active=False, closable=True, icon=None, parent=None):
         super().__init__(parent)
         self._title = title
         self._active = active
         self._closable = closable
         self._hover = 0.0
+        self._icon = None
 
         self.setFixedHeight(34)
         self.setMinimumWidth(self.MIN_WIDTH)
         self.setMaximumWidth(self.natural_max_width())
         self.setup_ui()
         self.apply_style()
+        if icon is not None:
+            self.set_icon(icon)
 
     def natural_max_width(self):
         return 270 if len(self._title) > 22 else 240
@@ -82,6 +85,21 @@ class TabButton(QFrame):
             self.clicked.emit()
         super().mousePressEvent(event)
 
+    def set_icon(self, pixmap):
+        """Site favicon'unu gosterir; renkli nokta favicon gelene kadar fallback'tir."""
+        if pixmap is None or pixmap.isNull():
+            return
+        self._icon = pixmap
+        self.icon_label.setFixedSize(16, 16)
+        self.icon_label.setStyleSheet("QLabel { background: transparent; }")
+        self.icon_label.setPixmap(
+            pixmap.scaled(
+                16, 16,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
+
     def apply_style(self):
         # Hover gecisi QSS :hover yerine hoverProgress uzerinden anime edilir;
         # ara renkler Theme.mix ile uretilir (yalnizca inaktif sekmede).
@@ -91,10 +109,11 @@ class TabButton(QFrame):
         else:
             bg_color = Theme.mix(Theme.tab_inactive, Theme.tab_hover, self._hover)
             border_color = Theme.mix(Theme.border_soft, Theme.border, self._hover)
-        dot_color = Theme.purple if self._active else Theme.subtle
-        self.icon_label.setStyleSheet(
-            f"QLabel {{ background-color: {dot_color}; border-radius: 4px; }}"
-        )
+        if self._icon is None:
+            dot_color = Theme.purple if self._active else Theme.subtle
+            self.icon_label.setStyleSheet(
+                f"QLabel {{ background-color: {dot_color}; border-radius: 4px; }}"
+            )
         self.setStyleSheet(
             f"""
             QFrame {{
@@ -195,7 +214,7 @@ class TabWidget(QWidget):
         self.apply_style()
 
     def add_tab(self, url=None, title="Yeni Sekme"):
-        self._tabs.append({"url": url or QUrl("tabx://newtab"), "title": title})
+        self._tabs.append({"url": url or QUrl("tabx://newtab"), "title": title, "icon": None})
         index = len(self._tabs) - 1
         # Ayni event-loop turunda birden fazla _render_tabs kosabilir
         # (updateViewReference, setCurrentIndex); bayrak turun sonunda
@@ -221,6 +240,13 @@ class TabWidget(QWidget):
         if 0 <= index < len(self._tabs):
             self._tabs[index]["title"] = text
             self._render_tabs()
+
+    def setTabIcon(self, index, pixmap):
+        """Favicon'u kaydeder ve mevcut butona uygular (tam re-render gerekmez)."""
+        if 0 <= index < len(self._tabs):
+            self._tabs[index]["icon"] = pixmap
+            if 0 <= index < len(self._buttons):
+                self._buttons[index].set_icon(pixmap)
 
     def setCurrentIndex(self, index):
         if 0 <= index < len(self._tabs):
@@ -294,6 +320,7 @@ class TabWidget(QWidget):
                 title=tab_info["title"],
                 active=i == self._active_index,
                 closable=True,
+                icon=tab_info.get("icon"),
             )
             tab_button.clicked.connect(lambda checked=False, idx=i: self.setCurrentIndex(idx))
             tab_button.closed.connect(lambda checked=False, idx=i: self._request_close(idx))

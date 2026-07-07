@@ -64,15 +64,47 @@ class UiStateStore:
         "tab_groups": [
             {
                 "name": "Work",
-                "items": [["✉", "Gmail"], ["⌘", "GitHub"], ["◫", "Notion"]],
+                "items": [
+                    ["✉", "Gmail", "https://mail.google.com"],
+                    ["⌘", "GitHub", "https://github.com"],
+                    ["◫", "Notion", "https://www.notion.so"],
+                ],
             },
             {
                 "name": "Vaha Projects",
-                "items": [["◎", "SAMS Panel"], ["◌", "SouthAfro"], ["☏", "WhatsApp"]],
+                "items": [
+                    ["◎", "SAMS Panel", ""],
+                    ["◌", "SouthAfro", ""],
+                    ["☏", "WhatsApp", "https://web.whatsapp.com"],
+                ],
             },
-            {"name": "Media", "items": [["▶", "YouTube"], ["◍", "Canva"]]},
-            {"name": "Shopping", "items": [["◆", "Trendyol"], ["◇", "Hepsiburada"]]},
+            {
+                "name": "Media",
+                "items": [
+                    ["▶", "YouTube", "https://www.youtube.com"],
+                    ["◍", "Canva", "https://www.canva.com"],
+                ],
+            },
+            {
+                "name": "Shopping",
+                "items": [
+                    ["◆", "Trendyol", "https://www.trendyol.com"],
+                    ["◇", "Hepsiburada", "https://www.hepsiburada.com"],
+                ],
+            },
         ],
+    }
+
+    # Eski (2 elemanli) kayitlari URL'ye kavusturmak icin bilinen site tablosu.
+    known_site_urls = {
+        "gmail": "https://mail.google.com",
+        "github": "https://github.com",
+        "notion": "https://www.notion.so",
+        "whatsapp": "https://web.whatsapp.com",
+        "youtube": "https://www.youtube.com",
+        "canva": "https://www.canva.com",
+        "trendyol": "https://www.trendyol.com",
+        "hepsiburada": "https://www.hepsiburada.com",
     }
 
     @classmethod
@@ -150,7 +182,9 @@ class UiStateStore:
             "tab_groups": [
                 {
                     "name": str(name),
-                    "items": [[str(icon), str(text)] for icon, text in items],
+                    "items": [
+                        [str(icon), str(text), str(url)] for icon, text, url in items
+                    ],
                 }
                 for name, items in tab_groups
             ],
@@ -528,16 +562,23 @@ class BrowserWindow(QMainWindow):
             name = str(group.get("name", "")).strip()
             if not name:
                 continue
-            items = [
-                (str(icon), str(text))
-                for icon, text in group.get("items", [])
-                if str(text).strip()
-            ]
+            items = []
+            for entry in group.get("items", []):
+                if not isinstance(entry, (list, tuple)) or len(entry) < 2:
+                    continue
+                icon, text = str(entry[0]), str(entry[1])
+                if not text.strip():
+                    continue
+                # Eski 2 elemanli kayitlar: bilinen sitelerden URL tamamla.
+                url = str(entry[2]) if len(entry) > 2 and entry[2] else ""
+                if not url:
+                    url = UiStateStore.known_site_urls.get(text.strip().lower(), "")
+                items.append((icon, text, url))
             self.tab_groups.append((name, items))
         if not self.tab_groups:
             defaults = UiStateStore.defaults["tab_groups"]
             self.tab_groups = [
-                (group["name"], [(icon, text) for icon, text in group["items"]])
+                (group["name"], [(icon, text, url) for icon, text, url in group["items"]])
                 for group in defaults
             ]
 
@@ -813,122 +854,71 @@ class BrowserWindow(QMainWindow):
         )
 
         layout = QVBoxLayout(sidebar)
-        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setContentsMargins(16, 18, 16, 18)
         layout.setSpacing(10)
 
+        # F2.6: sahte trafik isiklari ve islevsiz menu ogeleri kaldirildi;
+        # yalnizca calisan baglantilar listelenir.
         brand = QHBoxLayout()
         brand.setSpacing(10)
-        traffic = QHBoxLayout()
-        traffic.setSpacing(6)
-        for color in ["#ff5f57", "#febc2e", "#28c840"]:
-            dot = QLabel()
-            dot.setFixedSize(12, 12)
-            dot.setStyleSheet(f"background-color: {color}; border-radius: 6px;")
-            traffic.addWidget(dot)
-        brand.addLayout(traffic)
-        brand.addStretch(1)
-        close = self._icon_button("×", "Sol paneli kapat")
-        close.setFixedSize(28, 28)
-        close.clicked.connect(lambda checked=False: self.toggle_left_sidebar(False))
-        brand.addWidget(close)
-        layout.addLayout(brand)
-
-        logo = QHBoxLayout()
         logo_badge = QLabel("✦")
-        logo_badge.setFixedSize(38, 38)
+        logo_badge.setFixedSize(30, 30)
         logo_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         logo_badge.setStyleSheet(
             f"""
             QLabel {{
                 background-color: {Theme.purple_soft};
                 color: {Theme.purple};
-                border-radius: 14px;
-                font-size: 13px;
+                border-radius: 10px;
+                font-size: 12px;
                 font-weight: 800;
             }}
             """
         )
-        logo.addWidget(logo_badge)
+        brand.addWidget(logo_badge)
         logo_text = QLabel("TabX")
-        logo_text.setStyleSheet(f"font-size: 18px; font-weight: 800; color: {Theme.text};")
-        logo.addWidget(logo_text)
-        logo.addStretch(1)
-        layout.addLayout(logo)
+        logo_text.setStyleSheet(f"font-size: 15px; font-weight: 800; color: {Theme.text};")
+        brand.addWidget(logo_text)
+        brand.addStretch(1)
+        close = self._icon_button("×", "Sol paneli kapat")
+        close.setFixedSize(24, 24)
+        close.clicked.connect(lambda checked=False: self.toggle_left_sidebar(False))
+        brand.addWidget(close)
+        layout.addLayout(brand)
 
-        layout.addSpacing(10)
+        layout.addSpacing(8)
         self._add_sidebar_section(
             layout,
-            "KEŞFET",
+            "Gezinti",
             [
-                ("⌂", "Ana Sayfa", True),
-                ("⌕", "Keşfet", False),
-                ("↗", "Trendler", False),
-                ("◎", "Web Haritası", False),
-                ("▣", "Koleksiyonlar", False),
-            ],
-        )
-        self._add_sidebar_section(
-            layout,
-            "ARAÇLAR",
-            [
-                ("↓", "İndirilenler", False),
-                ("✎", "Notlar", False),
-                ("◱", "Ekran Görüntüleri", False),
-                ("文", "Çeviri", False),
-                ("⌘", "Kod Araçları", False),
-            ],
-        )
-        self._add_sidebar_section(
-            layout,
-            "HESAP",
-            [
+                ("⌂", "Ana sayfa", False, lambda: self.open_internal_page("newtab")),
+                ("⬇", "İndirilenler", False, lambda: self.open_internal_page("downloads")),
                 ("☆", "Favoriler", False, lambda: self.open_internal_page("bookmarks")),
                 ("◷", "Geçmiş", False, lambda: self.open_internal_page("history")),
                 ("⚙", "Ayarlar", False, lambda: self.open_internal_page("settings")),
             ],
         )
+
         custom_title = QHBoxLayout()
-        custom_label = QLabel("ÖZEL")
+        custom_label = QLabel("Özel kısayollar")
         custom_label.setStyleSheet(
-            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; margin-top: 8px;"
+            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px; margin-top: 8px;"
         )
         custom_title.addWidget(custom_label)
         custom_title.addStretch(1)
         add_shortcut = self._icon_button("+", "Kısayol ekle")
-        add_shortcut.setFixedSize(28, 28)
+        add_shortcut.setFixedSize(24, 24)
         add_shortcut.clicked.connect(self.add_custom_shortcut)
         custom_title.addWidget(add_shortcut)
         layout.addLayout(custom_title)
 
         self.custom_nav_layout = QVBoxLayout()
         self.custom_nav_layout.setContentsMargins(0, 0, 0, 0)
-        self.custom_nav_layout.setSpacing(6)
+        self.custom_nav_layout.setSpacing(2)
         layout.addLayout(self.custom_nav_layout)
         self._render_custom_nav_items()
 
         layout.addStretch(1)
-        sync = QFrame()
-        sync.setObjectName("syncCard")
-        sync.setStyleSheet(
-            f"""
-            QFrame#syncCard {{
-                background-color: {Theme.panel_alt};
-                border: 1px solid {Theme.border_soft};
-                border-radius: 18px;
-            }}
-            """
-        )
-        sync_layout = QVBoxLayout(sync)
-        sync_layout.setContentsMargins(14, 12, 14, 12)
-        sync_title = QLabel("Bellek dostu F2")
-        sync_title.setStyleSheet(f"font-size: 12px; font-weight: 800; color: {Theme.text};")
-        sync_text = QLabel("Fan sekmeler kapalı. Ek WebEngine görünümü yok.")
-        sync_text.setWordWrap(True)
-        sync_text.setStyleSheet(f"font-size: 11px; color: {Theme.muted};")
-        sync_layout.addWidget(sync_title)
-        sync_layout.addWidget(sync_text)
-        layout.addWidget(sync)
-
         return sidebar
 
     def _create_right_sidebar(self):
@@ -1333,6 +1323,12 @@ class BrowserWindow(QMainWindow):
         self._save_ui_state()
         self._render_custom_nav_items()
 
+    def remove_custom_shortcut(self, index):
+        if 0 <= index < len(self.custom_nav_items):
+            self.custom_nav_items.pop(index)
+            self._save_ui_state()
+            self._render_custom_nav_items()
+
     def _render_custom_nav_items(self):
         if not hasattr(self, "custom_nav_layout"):
             return
@@ -1343,10 +1339,44 @@ class BrowserWindow(QMainWindow):
             hint.setStyleSheet(f"font-size: 11px; color: {Theme.subtle}; padding: 2px 10px;")
             self.custom_nav_layout.addWidget(hint)
             return
-        for icon, text in self.custom_nav_items:
-            self.custom_nav_layout.addWidget(
-                self._sidebar_item(self._display_icon(icon, text), text, False)
+        for item_index, (icon, text) in enumerate(self.custom_nav_items):
+            row = HoverRevealRow()
+            row.setFixedHeight(30)
+            row.setCursor(Qt.CursorShape.PointingHandCursor)
+            row.setStyleSheet(
+                f"""
+                QFrame {{ background-color: transparent; border-radius: 8px; }}
+                QFrame:hover {{ background-color: {Theme.panel_alt}; }}
+                """
             )
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(10, 0, 4, 0)
+            row_layout.setSpacing(9)
+            icon_label = QLabel(self._display_icon(icon, text))
+            icon_label.setFixedWidth(22)
+            icon_label.setStyleSheet(
+                f"font-size: 12px; font-weight: 800; color: {Theme.muted}; background: transparent;"
+            )
+            text_label = QLabel(text)
+            text_label.setStyleSheet(
+                f"font-size: 12px; font-weight: 650; color: {Theme.muted}; background: transparent;"
+            )
+            row_layout.addWidget(icon_label)
+            row_layout.addWidget(text_label, 1)
+            remove = self._mini_button("×", "Kısayolu sil")
+            remove.clicked.connect(
+                lambda checked=False, idx=item_index: self.remove_custom_shortcut(idx)
+            )
+            row_layout.addWidget(remove)
+            row.register(remove)
+
+            def handle_press(event, item_row=row, item_text=text):
+                if event.button() == Qt.MouseButton.LeftButton:
+                    self._open_group_item(item_text, "")
+                QFrame.mousePressEvent(item_row, event)
+
+            row.mousePressEvent = handle_press
+            self.custom_nav_layout.addWidget(row)
 
     def add_tab_group(self):
         name, ok = TextInputDialog.get_text(self, "Sekme grubu oluştur", "Grup adı")
@@ -1366,8 +1396,13 @@ class BrowserWindow(QMainWindow):
             if not ok or not label:
                 return
 
+        url = ""
+        if self.current_view:
+            candidate = self.current_view.url().toString()
+            if candidate and not candidate.startswith("tabx://"):
+                url = candidate
         group_name, items = self.tab_groups[group_index]
-        items.append((self._icon_for(label), label))
+        items.append((self._icon_for(label), label, url))
         self.tab_groups[group_index] = (group_name, items)
         self._save_ui_state()
         self._render_tab_groups()
@@ -1451,9 +1486,9 @@ class BrowserWindow(QMainWindow):
                 )
                 self.tab_groups_layout.addWidget(empty)
                 continue
-            for item_index, (initials, label) in enumerate(items):
+            for item_index, (initials, label, url) in enumerate(items):
                 self.tab_groups_layout.addWidget(
-                    self._tab_group_item_row(group_index, item_index, initials, label)
+                    self._tab_group_item_row(group_index, item_index, initials, label, url)
                 )
 
     def _toggle_group_collapsed(self, name):
@@ -1474,13 +1509,17 @@ class BrowserWindow(QMainWindow):
     def _add_sidebar_section(self, layout, title, items):
         section = QLabel(title)
         section.setStyleSheet(
-            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; margin-top: 8px;"
+            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px; margin-top: 8px;"
         )
         layout.addWidget(section)
+        rows = QVBoxLayout()
+        rows.setContentsMargins(0, 0, 0, 0)
+        rows.setSpacing(2)
         for item in items:
             icon, text, active = item[:3]
             callback = item[3] if len(item) > 3 else None
-            layout.addWidget(self._sidebar_item(icon, text, active, callback))
+            rows.addWidget(self._sidebar_item(icon, text, active, callback))
+        layout.addLayout(rows)
 
     def _sidebar_item(self, icon, text, active=False, callback=None):
         item = QFrame()
@@ -1569,9 +1608,18 @@ class BrowserWindow(QMainWindow):
         row.mousePressEvent = handle_press
         return row
 
-    def _tab_group_item_row(self, group_index, item_index, initials, label):
+    def _open_group_item(self, label, url):
+        """Kayitli sekmeyi yeni sekmede acar; URL yoksa etiketle arama yapar."""
+        if not url:
+            query = QUrl.toPercentEncoding(label).data().decode()
+            url = f"https://www.google.com/search?q={query}"
+        self.add_new_tab(QUrl(url), label)
+
+    def _tab_group_item_row(self, group_index, item_index, initials, label, url=""):
         row = HoverRevealRow()
         row.setFixedHeight(28)
+        row.setCursor(Qt.CursorShape.PointingHandCursor)
+        row.setToolTip(url or f"Ara: {label}")
         row.setStyleSheet(
             f"""
             QFrame {{ background-color: transparent; border-radius: 8px; }}
@@ -1607,6 +1655,13 @@ class BrowserWindow(QMainWindow):
         )
         layout.addWidget(remove)
         row.register(remove)
+
+        def handle_press(event, item_label=label, item_url=url):
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._open_group_item(item_label, item_url)
+            QFrame.mousePressEvent(row, event)
+
+        row.mousePressEvent = handle_press
         return row
 
     def _mini_button(self, label, tooltip):
@@ -1676,6 +1731,9 @@ class BrowserWindow(QMainWindow):
         )
         new_view.loadFinished.connect(
             lambda ok, view=new_view: self._record_history(ok, view)
+        )
+        new_view.iconChanged.connect(
+            lambda icon, view=new_view: self._handle_icon_changed(view, icon)
         )
         new_view.page().internalUrlRequested.connect(
             lambda internal_url, view=new_view: self._handle_internal_url(view, internal_url)
@@ -1824,6 +1882,15 @@ class BrowserWindow(QMainWindow):
         elif clean_title.startswith("data:text/html"):
             clean_title = "Yeni Sekme"
         self.tabs.setTabText(index, clean_title)
+
+    def _handle_icon_changed(self, view, icon):
+        try:
+            index = self.tabs._views.index(view)
+        except ValueError:
+            return
+        pixmap = icon.pixmap(16, 16)
+        if not pixmap.isNull():
+            self.tabs.setTabIcon(index, pixmap)
 
     def go_back(self):
         if self.current_view and hasattr(self.current_view, "back"):

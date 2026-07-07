@@ -44,7 +44,9 @@ Kullanici geri bildirimiyle acildi (2026-07-07): sag panel/toolbar/ayarlar sadel
 | done | Ayarlarda switch bileseni | `.switch-row`/`.switch`/`.knob` CSS + `_switch_row_html` — Hareket ve Gizlilik kartlarindaki durum+eylem pill ciftleri tek anahtara indi. |
 | done | Rail'lerin kaldirilmasi | 54px sol/sag rail'ler silindi; ☰/▦ toggle'lari toolbar'in iki ucunda (`_set_rail_button_active` hayalet stil). Icerik tam genislik kullanir. |
 | done | Overlay paneller | Sol/sag sidebar layout'tan cikti; central'a parent'li glass overlay (`Theme.glass_strong`), `_slide_overlay_sidebar` pos animasyonuyla kenardan kayar, icerigi itmez. `resizeEvent` -> `_position_sidebars`. |
-| todo | Sol panel ayni dile gecis | Sol sidebar bolum basliklari/satirlari henuz eski stilde; ayni yogunluk dili uygulanmali. |
+| done | Sol panel ayni dile gecis | Sahte trafik isiklari, islevsiz menu ogeleri (Kesfet/Trendler/Notlar vb.) ve sahte sync karti kaldirildi; tek "Gezinti" bolumu (5 calisan ic sayfa linki) + "Ozel kisayollar" (hover-reveal silme, tiklaninca arama). |
+| done | Sekme gruplari tiklanabilir | Veri modeli (icon, ad, URL) uclusune genisletildi; eski 2'li kayitlar bilinen site tablosuyla (`UiStateStore.known_site_urls`) migrate edilir. Tiklama yeni sekmede acar; URL yoksa Google aramasi. `add_current_tab_to_group` artik URL kaydeder. |
+| done | Sekme favicon'lari | `QWebEngineView.iconChanged` -> `TabWidget.setTabIcon` -> `TabButton.set_icon`; favicon gelene kadar renkli nokta fallback. |
 
 ## F3 - Gizlilik
 
@@ -108,7 +110,7 @@ Her biri kapatilabilir modul olarak `features/` altina gider; cekirdege gomulmez
 | done | Toolbar duzeni + profil cipi | Butonlar gruplu (`⋯` overflow menusu), aktif profil toolbar'da cip olarak gorunur; cip menusunden profil gecisi/ekleme. |
 | done | Settings sayfasi | `tabx://settings` ic route olarak basladi; gercek ayar kontrolleri sonraki dilim. |
 | done | About sayfasi | `tabx://about` ic route olarak basladi; surum/build bilgisi otomatik degil. |
-| todo | Sekme favicon'lari | `QWebEnginePage.iconChanged` -> TabButton'daki renkli noktanin yerine site ikonu; fan kartlarinda da kullanilabilir. |
+| done | Sekme favicon'lari | `iconChanged` -> `setTabIcon` -> `TabButton.set_icon` (16px, nokta fallback). Fan kartlarinda kullanim sonraki dilim. |
 | todo | Error page | Ag/sertifika hata sayfalari icin TabX tasarimi. |
 | todo | Context menu | Geri/ileri, linki yeni sekmede ac, kopyala, inspect. |
 | done | Keyboard shortcuts | `_setup_shortcuts` — Cmd+T/W/R, Cmd+[/], Cmd+L (adres), fiziksel Ctrl+Tab (sekme dongusu), Cmd+1..9 (9=son), Cmd+Y (gecmis), Cmd+Shift+J (indirilenler). ApplicationShortcut context. Ayarlanabilir kisayollar sonraki dilim. |

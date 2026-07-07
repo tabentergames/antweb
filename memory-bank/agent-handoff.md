@@ -4,6 +4,25 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **Sekme gruplari calisir + favicon + sol panel F2.6 (2026-07-07, kullanici
+  raporu: "grup kayitlari tiklaninca calismiyor"):** Kok neden: veri modeli
+  URL tutmuyordu (yalnizca icon+ad). Cozum: (1) ogeler `(icon, ad, URL)`
+  uclusune genisletildi — `UiStateStore.save/defaults` 3 elemanli yazar,
+  `_load_ui_state` 2 elemanli ESKI kayitlari kabul edip bilinen site
+  tablosundan (`UiStateStore.known_site_urls`) URL tamamlar; bu migrasyon
+  deseni gelecekte model genisletirken ornek alinmali (dosyayi bozmadan
+  gecis). (2) Tiklama `_open_group_item(label, url)` — URL bossa Google
+  aramasi fallback'i; "kayitli ama olu" satir kalmaz. (3) Favicon:
+  `iconChanged` -> `TabWidget.setTabIcon` -> `TabButton.set_icon`;
+  `setTabIcon` mevcut butona dogrudan uygular (tam `_render_tabs` cagirmaz —
+  render sekme animasyon bayraklarini bozabilirdi). `TabButton.apply_style`
+  nokta stilini yalnizca `self._icon is None` iken yazar; favicon geldikten
+  sonra hover render'lari ikonu ezmez. (4) Sol panel: islevsiz sus ogeleri
+  (Kesfet/Trendler/Notlar/Ceviri/Kod Araclari, sahte trafik isiklari, sahte
+  sync karti) SILINDI — calismayan UI gostermeme ilkesi; kalanlar 5 calisan
+  ic sayfa linki + ozel kisayollar (hover-reveal silme). Ozel kisayollar da
+  URL'siz oldugundan tiklama arama fallback'ine gider; kisayola URL alani
+  eklemek kucuk bir gelecek dilimi.
 - **F2.6 overlay paneller + rail'siz kabuk (2026-07-07, kullanici geri bildirimi:
   "paneller ekrani daraltiyor"):** 54px sol/sag rail'ler tamamen kaldirildi
   (`_create_left_rail`/`_create_right_rail`/`_rail_button` silindi); ☰/▦

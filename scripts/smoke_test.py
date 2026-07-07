@@ -273,6 +273,40 @@ def run() -> int:
     )
     assert "Ad/tracker blocker" in settings_html, "gizlilik switch etiketi yok"
 
+    # Sekme gruplari — 3 elemanli veri modeli + tiklama akisi + bilinen site migrasyonu.
+    for _name, group_items in window.tab_groups:
+        assert all(len(item) == 3 for item in group_items), "grup ogesi 3 elemanli degil"
+    known_labels = {"gmail", "github", "youtube"}
+    for _name, group_items in window.tab_groups:
+        for _icon, label, url in group_items:
+            if label.strip().lower() in known_labels:
+                assert url, f"{label} icin bilinen URL doldurulmadi"
+    dl_before = window.tabs.count()
+    window._open_group_item("Ornek", "https://example.com")
+    assert window.tabs.count() == dl_before + 1, "grup ogesi yeni sekme acmadi"
+    assert window.current_view.url().toString().startswith("https://example.com"), (
+        "grup ogesi yanlis URL acti"
+    )
+    window.close_tab(window.tabs.count() - 1)
+
+    # Favicon — setTabIcon buton uzerine pixmap uygular.
+    from PyQt6.QtGui import QColor, QPixmap
+
+    fav_pixmap = QPixmap(16, 16)
+    fav_pixmap.fill(QColor("red"))
+    window.tabs.setTabIcon(0, fav_pixmap)
+    assert not window.tabs._buttons[0].icon_label.pixmap().isNull(), (
+        "favicon tab butonuna uygulanmadi"
+    )
+
+    # Sol panel — ozel kisayol ekle/sil.
+    window.custom_nav_items.append(("★", "SmokeKisayol"))
+    window._render_custom_nav_items()
+    window.remove_custom_shortcut(len(window.custom_nav_items) - 1)
+    assert all(text != "SmokeKisayol" for _icon, text in window.custom_nav_items), (
+        "ozel kisayol silinmedi"
+    )
+
     # F2.5 — tab strip ekle/kapat: once reduced-motion yolu (deterministik).
     before = window.tabs.count()
     window.add_new_tab()
