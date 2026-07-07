@@ -232,8 +232,8 @@ class TextInputDialog(QDialog):
     def _dialog_style(self):
         return f"""
             QDialog {{
-                background-color: {Theme.panel};
-                border: 1px solid {Theme.border};
+                background-color: {Theme.glass_strong};
+                border: 1px solid {Theme.glass_border};
                 border-radius: 18px;
             }}
         """
@@ -248,7 +248,13 @@ class ConfirmDialog(QDialog):
         self.setModal(True)
         self.setFixedWidth(380)
         self.setStyleSheet(
-            f"QDialog {{ background-color: {Theme.panel}; border-radius: 18px; }}"
+            f"""
+            QDialog {{
+                background-color: {Theme.glass_strong};
+                border: 1px solid {Theme.glass_border};
+                border-radius: 18px;
+            }}
+            """
         )
 
         layout = QVBoxLayout(self)

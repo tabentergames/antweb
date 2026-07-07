@@ -42,6 +42,7 @@ Son guncelleme: 2026-07-07
   - **Toolbar duzeni + profil cipi:** toolbar gezinme | adres | sayfa islemleri | profil olarak ayiricilarla gruplu; az kullanilan eylemler (sekme konumu, ayarlar, hakkinda) `⋯` menusunde. Sag ucta aktif profili gosteren cip: tiklayinca profil gecis menusu (aktif isaretli) + "Yeni profil…". `_menu_style()` QMenu'ler icin ortak token-bazli stil.
   - **tabx:// yonlendirme:** `TabXPage.acceptNavigationRequest` ic linkleri sinyalle kabuga tasir (`_handle_internal_url`); komut linkleri: `history/clear`, `bookmarks/remove?id=`, `settings/profile?name=`, `settings/profile-new`, `settings/reduced-motion`.
   - **F2.5 reduced-motion ayari:** `tabx://settings` "Hareket" karti — `toggle_reduced_motion()` `Motion.configure` cagirir, `UiStateStore`'a `reduced_motion` alanini yazar; `BrowserWindow.__init__` acilista `Theme.configure` sonrasi `Motion.configure(not self.reduced_motion)` ile tercihi uygular.
+  - **F2.5 glass yuzey gecisi:** `TextInputDialog`/`ConfirmDialog` arka plani `Theme.panel` yerine `Theme.glass_strong` + kenarlik `Theme.glass_border`; offscreen render ile pixel/alfa dogrulandi (light+dark). Sidebar/rail/tab-strip docked yuzeyler oldugundan kapsam disi (DESIGN_SYSTEM §2 yalnizca floating/overlay yuzeyleri kapsiyor); toolbar zaten `Theme.toolbar` yari saydam tokenini kullaniyor.
 
 ## Ana teknik borc
 

@@ -4,6 +4,22 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **F2.5 glass yuzey gecisi tamamlandi (2026-07-07):** `TextInputDialog._dialog_style`
+  ve `ConfirmDialog.__init__` icindeki `background-color: Theme.panel` ->
+  `Theme.glass_strong` + `border: 1px solid Theme.glass_border` (FanOverlay ile
+  ayni desen). Kapsam bilinçli daraltildi: DESIGN_SYSTEM §2 "cam etkisi"ni
+  yalnizca floating/overlay yuzeyler icin tanimliyor (overlay panel, komut
+  paleti, floating widget, bildirim) — sol/sag sidebar, rail'ler ve tab-strip
+  `_build_main_shell`'de HBoxLayout icine DOCKED (icerigi iterek acilir,
+  ustune binmez), bu yuzden kapsam disi birakildi; toolbar zaten kendi
+  `Theme.toolbar` (rgba, 0.96 alpha) tokenini kullaniyor, dokunulmadi. Kritik
+  not: `QDialog` FanOverlay'in aksine top-level pencere, `WA_TranslucentBackground`
+  set edilmemis; bu yuzden gercek masaustu-arkasi seffaflik YOK, sadece dialog'un
+  kendi arka planinda hafif (~%90-92 alfa) bir ton degisimi var — bunu offscreen
+  `grab()` + pixel/alfa ornekleme ile light+dark'ta dogruladim (grafik ortami
+  olmadigi icin gercek ekranda gozle dogrulama yapilamadi, bir sonraki agent
+  `python3 main.py` ile "Yeni profil…" veya "Sekme grubu ekle" dialoglarini
+  acip gozle kontrol etmeli).
 - **F2.5 reduced-motion ayari tamamlandi (2026-07-07):** `tabx://settings` "Hareket"
   karti — `BrowserWindow.toggle_reduced_motion()` `Motion.configure` cagirir ve
   `UiStateStore`'a yeni `reduced_motion` alanini yazar (`defaults`/`load`/`save`
@@ -69,34 +85,36 @@ Son guncelleme: 2026-07-07
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-Faz: F2.5 | Modul: `ui/theme.py`, `core/browser_window.py` (sidebar/dialog QSS) |
-Kapsam: glass yuzey gecisi.
-(Reduced-motion ayari tamamlandi; animasyon+erisilebilirlik dilimi kapandi.
- Sira DESIGN_SYSTEM §2'de tanimli glass/scrim yuzeylerin gercek UI'a yayilmasinda.)
+F2.5'in glass yuzey gecisi ve reduced-motion ayari tamamlandi; backlog'ta F2.5
+altinda yalnizca `todo` dilimler kaldi (cikis/giris sayfa gecisi, frameless
+kabuk arastirmasi) — ikisi de dusuk oncelikli/arastirma agirlikli. Bunun
+yerine kullanici yuzeyi acisindan daha degerli olan F3/Temel tarayici
+yuzeyleri fazlarindan birine gecilmesi onerilir:
+
+Faz: F3 | Modul: `features/privacy`, `core/browser_window.py` (`_settings_page_html`) |
+Kapsam: adblock/HTTPS upgrade toggle'larini `tabx://settings` yuzeyine baglama;
+state `data/ui_state.json`'da.
 
 Neden:
 
-- `Theme.glass`, `glass_strong`, `glass_border`, `scrim` tokenlari F2.5'te
-  eklendi ve su an yalnizca fan overlay kullaniyor; sol/sag sidebar ve
-  dialoglar hala duz `Theme.panel` renginde.
-- Kucuk, gorsel olarak dogrulanabilir bir dilim; DESIGN_SYSTEM §7 teslim
-  kontrol listesiyle uyumlu.
+- F3 gizlilik ozellikleri (ad_blocker, https_upgrade) calisir durumda ama
+  kullanicinin kapatma/acma sansi yok — mevcut teknik borc listesinde acikca
+  belirtilmis.
+- Komut linki deseni hazir: bu oturumda eklenen `tabx://settings/reduced-motion`
+  ve daha once eklenen `settings/profile?name=` ayni desenin ucuncu/dorduncu
+  ornegi olur (`_handle_internal_url` icine yeni `if key == "settings" and
+  action == "..."` dali + `UiStateStore`'a yeni alan).
 
 Net teslim kriteri:
 
-- Sol/sag sidebar ve `TextInputDialog`/`ConfirmDialog` (veya esdegeri) arka
-  planlari `Theme.glass*` tokenlarina tasinir; light+dark ikisinde de kontrast
-  korunur.
-- `python3 main.py` + `python3 scripts/smoke_test.py` geciyor; animasyon
-  gorsel olarak dogrulanamadiysa teslim notunda hangi ekranin manuel
-  kontrol edilecegi belirtilir.
+- `tabx://settings` "Gizlilik" kartinda ad blocker ve HTTPS upgrade icin ayri
+  toggle'lar; durumlari `data/ui_state.json`'a yazilir, acilista
+  `PrivacyService`'e uygulanir.
+- `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
 
-Paralel yurutulebilir ikinci gorev (farkli dosyalar):
-
-Faz: F3 | Modul: `features/privacy` | Kapsam: adblock/HTTPS upgrade toggle'larini
-`tabx://settings` yuzeyine baglama; state `data/ui_state.json`'da. Komut linki
-deseni icin `tabx://settings/reduced-motion` (bu tur) ve `settings/profile?name=`
-ornek alinabilir.
+Paralel yurutulebilir ikinci gorev (farkli yuzey): "Temel tarayici yuzeyleri"
+altindan `next` isaretli Downloads sayfasi (indirme listesi, duraklat/devam,
+klasorde goster) — F3'ten bagimsiz dosyalar (`features/` altinda yeni modul).
 
 ## Teslim notu formati
 
