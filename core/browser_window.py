@@ -18,7 +18,12 @@ os.environ["QT_WEBENGINE_CHROMIUM_FLAGS"] = "--enable-features=NetworkService"
 
 from PyQt6.QtCore import QPoint, Qt, QTimer, QUrl, QUrlQuery, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings, QWebEngineProfile
+from PyQt6.QtWebEngineCore import (
+    QWebEngineLoadingInfo,
+    QWebEnginePage,
+    QWebEngineProfile,
+    QWebEngineSettings,
+)
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 
 # F3 privacy layer
@@ -1788,6 +1793,9 @@ class BrowserWindow(QMainWindow):
             lambda internal_url, view=new_view: self._handle_internal_url(view, internal_url)
         )
         new_view.page().permissionRequested.connect(self._handle_permission_request)
+        new_view.page().loadingChanged.connect(
+            lambda info, view=new_view: self._handle_load_status(view, info)
+        )
         self.privacy.attach_tab(new_view)
 
         index = self.tabs.add_tab(url, title)
@@ -2017,7 +2025,9 @@ class BrowserWindow(QMainWindow):
             return
         self._load_internal_page(self.current_view, page_key)
 
-    INTERNAL_PAGES = {"newtab", "settings", "about", "history", "bookmarks", "downloads"}
+    INTERNAL_PAGES = {
+        "newtab", "settings", "about", "history", "bookmarks", "downloads", "error",
+    }
 
     def _load_internal_page(self, view, page_key):
         page_key = page_key if page_key in self.INTERNAL_PAGES else "newtab"
@@ -2046,6 +2056,7 @@ class BrowserWindow(QMainWindow):
             "history": "Geçmiş",
             "bookmarks": "Favoriler",
             "downloads": "İndirilenler",
+            "error": "Hata",
         }.get(page_key, "Yeni Sekme")
 
     def _internal_page_html(self, page_key):
@@ -2059,6 +2070,8 @@ class BrowserWindow(QMainWindow):
             return self._bookmarks_page_html()
         if page_key == "downloads":
             return self._downloads_page_html()
+        if page_key == "error":
+            return self._error_page_html()
         return self._new_tab_html()
 
     def _handle_internal_url(self, view, url):
@@ -2123,6 +2136,38 @@ class BrowserWindow(QMainWindow):
             self._load_internal_page(view, "settings")
             return
         self._load_internal_page(view, key)
+
+    def _handle_load_status(self, view, info):
+        """Gercek yukleme hatalarinda TabX temali hata sayfasi gosterir.
+
+        LoadStoppedStatus (kullanici iptali / yeni navigasyon) hata sayilmaz.
+        HTTPS upgrade fallback'i devredeyken (https denemesi basarisiz olup
+        privacy katmani http'ye yeniden yonlendirirken) karisilmaz; http de
+        basarisiz olursa o hata normal yoldan buraya duser.
+        """
+        if info.status() != QWebEngineLoadingInfo.LoadStatus.LoadFailedStatus:
+            return
+        failed_url = info.url()
+        if failed_url.scheme() not in {"http", "https"}:
+            return
+        host = failed_url.host().lower()
+        https_layer = self.privacy.https_interceptor
+        if failed_url.scheme() == "https" and (
+            host in https_layer._pending or host in https_layer._fallback_hosts
+        ):
+            return
+        self._show_error_page(view, failed_url.toString(), info.errorString())
+
+    def _show_error_page(self, view, failed_url, error_text):
+        view._internal_key = "error"
+        view.setHtml(self._error_page_html(failed_url, error_text), QUrl("tabx://error"))
+        if view is self.current_view:
+            self.address_bar.setText(failed_url)
+        try:
+            index = self.tabs._views.index(view)
+        except ValueError:
+            return
+        self.tabs.setTabText(index, self._internal_page_title("error"))
 
     def _record_history(self, ok, view):
         if not ok:
@@ -2656,6 +2701,55 @@ class BrowserWindow(QMainWindow):
             <p class="subtitle">Bu oturumdaki indirmeler. Kayıtlar uygulama kapanınca sıfırlanır.</p>
             {refresh_row}
             <section class="rows">{body}</section>
+          </main>
+        </body>
+        </html>
+        """
+
+    def _error_page_html(self, failed_url="", error_text=""):
+        safe_url = html_module.escape(failed_url, quote=True)
+        safe_error = html_module.escape(error_text or "Sayfa yüklenemedi.")
+        retry_html = (
+            f'<a class="pill" style="text-decoration:none;" href="{safe_url}">↻ Tekrar dene</a>'
+            if failed_url
+            else ""
+        )
+        url_row = (
+            f'<p style="word-break: break-all;"><b>{safe_url}</b></p>' if failed_url else ""
+        )
+        return f"""
+        <!doctype html>
+        <html lang="tr">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Sayfa yüklenemedi</title>
+          <style>{self._internal_page_base_css()}</style>
+        </head>
+        <body>
+          <main>
+            <p class="eyebrow">TabX</p>
+            <h1>Sayfa yüklenemedi</h1>
+            <p class="subtitle">{safe_error}</p>
+            <section class="grid">
+              <article class="card">
+                <h2>Ne oldu?</h2>
+                {url_row}
+                <p>Adres yanlış olabilir, site geçici olarak erişilemez durumda olabilir ya da internet bağlantısında sorun olabilir.</p>
+                <div class="pill-row">
+                  {retry_html}
+                  <a class="pill" style="text-decoration:none;" href="tabx://newtab">⌂ Ana sayfa</a>
+                </div>
+              </article>
+              <article class="card">
+                <h2>Deneyebileceklerin</h2>
+                <ul>
+                  <li>Adresi kontrol edip yeniden dene.</li>
+                  <li>Bağlantını kontrol et.</li>
+                  <li>Birkaç dakika sonra tekrar dene.</li>
+                </ul>
+              </article>
+            </section>
           </main>
         </body>
         </html>

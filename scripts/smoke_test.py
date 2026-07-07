@@ -314,6 +314,50 @@ def run() -> int:
     assert not any("Seçimi kopyala" in t for t in plain_texts), "secimsiz menude kopyala var"
     assert any("Sayfa adresini" in t for t in plain_texts), "sayfa adresi kopyala yok"
 
+    # Error page — hata durum ayrimi + sablon + https-fallback carpismasi yok.
+    from PyQt6.QtWebEngineCore import QWebEngineLoadingInfo
+
+    err_html = window._error_page_html("https://ornek-yok.example", "DNS çözümlenemedi")
+    assert "Sayfa yüklenemedi" in err_html and "Tekrar dene" in err_html, "hata sablonu eksik"
+    assert "ornek-yok.example" in err_html, "hata sablonu URL gostermiyor"
+    assert window._internal_page_key(QUrl("tabx://error")) == "error", "error ic sayfa anahtari yok"
+    assert "<h1>" in window._internal_page_html("error"), "genel hata sayfasi bos"
+
+    class _FakeLoadInfo:
+        def __init__(self, status, url, error="baglanti hatasi"):
+            self._status = status
+            self._url = QUrl(url)
+            self._error = error
+
+        def status(self):
+            return self._status
+
+        def url(self):
+            return self._url
+
+        def errorString(self):
+            return self._error
+
+    shown = []
+    original_show_error = window._show_error_page
+    window._show_error_page = lambda view, url, text: shown.append(url)
+
+    fail = QWebEngineLoadingInfo.LoadStatus.LoadFailedStatus
+    stop = QWebEngineLoadingInfo.LoadStatus.LoadStoppedStatus
+    window._handle_load_status(window.current_view, _FakeLoadInfo(fail, "https://kirik.example/a"))
+    assert shown == ["https://kirik.example/a"], "gercek hata sayfa gostermedi"
+    window._handle_load_status(window.current_view, _FakeLoadInfo(stop, "https://kirik.example/b"))
+    assert len(shown) == 1, "iptal edilen yukleme hata sayildi"
+    window._handle_load_status(window.current_view, _FakeLoadInfo(fail, "tabx://newtab"))
+    assert len(shown) == 1, "tabx sayfasi hata sayildi"
+    window.privacy.https_interceptor._fallback_hosts.add("fallback.example")
+    window._handle_load_status(window.current_view, _FakeLoadInfo(fail, "https://fallback.example/x"))
+    assert len(shown) == 1, "https fallback devredeyken hata sayfasi basildi"
+    window._handle_load_status(window.current_view, _FakeLoadInfo(fail, "http://fallback.example/x"))
+    assert len(shown) == 2, "http yeniden denemesi basarisizken hata sayfasi gosterilmedi"
+    window.privacy.https_interceptor._fallback_hosts.discard("fallback.example")
+    window._show_error_page = original_show_error
+
     # Sol panel — ozel kisayol ekle/sil.
     window.custom_nav_items.append(("★", "SmokeKisayol"))
     window._render_custom_nav_items()

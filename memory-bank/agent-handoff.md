@@ -4,6 +4,19 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **Error page tamamlandi (2026-07-07):** `loadFinished(ok=False)` DEGIL,
+  `page.loadingChanged` + `QWebEngineLoadingInfo.LoadStatus` kullanildi —
+  kritik ayrim: `LoadStoppedStatus` (kullanici iptali / hizli navigasyon)
+  hata DEGILDIR; loadFinished bu ikisini ayirt edemez ve yeni yuklemenin
+  ustune hata sayfasi basma yarisi dogurur. HTTPS-fallback carpisma kurali:
+  scheme https VE host `https_interceptor._pending`/`._fallback_hosts`
+  icindeyse sus (privacy http'ye retry edecek); http denemesi de duserse o
+  hata normal yoldan sayfaya doner. `tabx://error` INTERNAL_PAGES'e eklendi —
+  eklenmeseydi `_internal_page_key` "newtab" fallback'i verir ve
+  `_handle_internal_url` echo-guard'i patlar (setHtml echo'su newtab'a
+  yonlenirdi); dinamik icerikli yeni ic sayfa eklerken bu tuzaga dikkat.
+  E2E dogrulama: gercek DNS-fail navigasyonuyla `_internal_key == "error"`
+  assert edildi (offscreen'de calisiyor).
 - **Context menu tamamlandi (2026-07-07):** `BrowserTab.contextMenuEvent`
   override — Qt6'da baglam bilgisi `view.lastContextMenuRequest()`'ten gelir
   (QWebEngineContextMenuRequest: `linkUrl()`, `selectedText()`); Qt5'teki
@@ -214,18 +227,23 @@ Klavye kisayollari ve Downloads tamamlandi. "Temel tarayici yuzeyleri"nde
 kalan dilimler: context menu, sekme favicon'lari, error page. F3'te yalnizca
 site veri temizleme kaldi. Onerilen siradaki is:
 
-Faz: Temel tarayici yuzeyleri | Modul: `core/browser_window.py`
-(`_internal_page_base_css` deseni + `BrowserTab`) | Kapsam: error page —
-ag/DNS/sertifika hatalarinda beyaz Chromium hatasi yerine TabX temali sayfa.
+"Temel tarayici yuzeyleri" fazi KAPANDI (downloads, kisayollar, context
+menu, error page, favicon, toolbar/panel tasarimi hepsi done). Kalan tek
+kucuk F3 isi:
 
-Yaklasim: `loadFinished(ok=False)` yakalanip (https_upgrade fallback'iyle
-CAKISMAMALI — once `PrivacyService._on_load_finished` denenir, o URL
-dondurmediyse hata sayfasi goster) `setHtml` ile ic sayfa CSS'ini kullanan
-bir hata sablonu basilir; "Tekrar dene" linki `tabx://` komut deseniyle
-orijinal URL'ye yeniden gider.
+Faz: F3 | Modul: `core/browser_window.py` (`_settings_page_html`,
+`_handle_internal_url`) | Kapsam: site veri temizleme — Gizlilik kartina
+"Site verilerini temizle" komutu; `web_profile.clearHttpCache()` +
+`web_profile.cookieStore().deleteAllCookies()`. Komut linki deseni hazir
+(`tabx://settings/clear-site-data`); islem sonrasi sayfa yeniden yuklenip
+kisa onay gosterilebilir.
 
-Alternatif dilim: F3'un son isi site veri temizleme (clearHttpCache +
-cookieStore().deleteAllCookies(), Gizlilik kartina buton).
+Bundan sonrasi yeni faz secimi: F5 Productivity (todo widget, kanban,
+notlar, web clipper), F6 Developer Tools (snippet, UA gecisi, request log,
+DevTools) veya F7 Power UX (split view, komut paleti, video pop-out...).
+Kullanici gorsel cilaya deger veriyor; F7'nin komut paleti (Cmd+K,
+glass_strong overlay) iyi bir ilk aday olabilir — karar kullaniciya
+sorulmali.
 
 Neden:
 
