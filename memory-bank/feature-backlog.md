@@ -31,6 +31,19 @@ Kurallar: `docs/DESIGN_SYSTEM.md`. Motion altyapisina dokunan isler SIRALI yurut
 | todo | Cikis/giris sayfa gecisi | Yeni sekme dashboard'una acilirken yumusak giris animasyonu. |
 | todo | Frameless kabuk arastirmasi | FramelessWindowHint + macOS trafik isiklari/surukleme; ayri arastirma dilimi, dogrudan uygulama yazma. |
 
+## F2.6 - Panel Yogunluk Gecisi (gorsel sadelestirme)
+
+Kullanici geri bildirimiyle acildi (2026-07-07): sag panel/toolbar/ayarlar sadelestirmesi.
+
+| Durum | Is | Not |
+| --- | --- | --- |
+| done | Hover-reveal eylemler | `HoverRevealRow` — grup basligi/satirindaki +/× butonlari yalnizca fare uzerindeyken gorunur (RetainSizeWhenHidden ile ziplamasiz). |
+| done | Grup kartlari -> daraltilabilir bolumler | Chevron + ad + soluk sayi; tiklaninca daralt/ac (`_collapsed_groups`, oturum ici). Kalin kartlar kalkti. |
+| done | Workspace yatay cipleri | Mor dolgu yalnizca aktif cipte; digerleri hayalet. Silme sag tik menusunde. Elle satir sarma (flow layout yok). |
+| done | Kenarliksiz toolbar ikonlari | `_icon_button` hayalet stil; adres cubugu tek cerceveli eleman. Profil cipi kuculdu (30px, kenarliksiz). |
+| done | Ayarlarda switch bileseni | `.switch-row`/`.switch`/`.knob` CSS + `_switch_row_html` — Hareket ve Gizlilik kartlarindaki durum+eylem pill ciftleri tek anahtara indi. |
+| todo | Sol panel ayni dile gecis | Sol sidebar bolum basliklari/satirlari henuz eski stilde; ayni yogunluk dili uygulanmali. |
+
 ## F3 - Gizlilik
 
 | Durum | Is | Not |

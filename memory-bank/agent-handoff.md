@@ -4,6 +4,26 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **F2.6 panel yogunluk gecisi tamamlandi (2026-07-07, kullanici onayli tasarim):**
+  Sag panel, toolbar ve ayarlar sayfasi sadelestirildi. Kritik desenler:
+  (1) `HoverRevealRow` (browser_window.py, dialog siniflarindan sonra) —
+  eylem butonlarini enter/leave ile gosterir; `RetainSizeWhenHidden` sart,
+  yoksa satir hover'da ziplar. Yeni liste satirlarinda bu sinifi kullan.
+  (2) Grup daraltma durumu `self._collapsed_groups` (set, oturum ici —
+  bilincli olarak persist edilmiyor). (3) Workspace ciplerinde flow layout
+  yerine tahmini genislikle elle satir sarma var (`26 + 7*len(ad)` px);
+  Qt'de hazir FlowLayout yok, gercek FlowLayout gerekirse ayri dilim.
+  (4) Workspace silme sag tik context menusunde (`_workspace_context_menu`)
+  — kalici × butonlari kaldirildi; ayni desen baska liste ogelerine de
+  uygulanabilir. (5) Ayarlar switch'i: `.switch`/`.knob` CSS base css'te,
+  `_switch_row_html` helper — yeni bool ayarlar pill cifti DEGIL switch
+  kullanmali. (6) Toolbar `_icon_button` artik kenarliksiz; adres cubugu
+  toolbar'daki tek cerceveli eleman — yeni toolbar butonlari da cercevesiz
+  olmali. GORSEL DOGRULAMA NOTU: offscreen ortamda sag panel + toolbar
+  pixel dogrulamasi yapildi (grab); tabx://settings switch'leri yalnizca
+  HTML assert'iyle dogrulandi — QWebEngineView offscreen grab bos donuyor.
+  Bir sonraki gercek ekranda `python3 main.py` ile settings sayfasina ve
+  hover-reveal davranisina gozle bakilmali.
 - **Klavye kisayollari tamamlandi (2026-07-07):** `_setup_shortcuts` —
   `__init__`'de `_build_main_shell`'den SONRA cagrilir (address_bar/tabs'a
   ihtiyac duyar). Kritik kararlar: (1) `ApplicationShortcut` context kullanildi
@@ -150,6 +170,10 @@ site veri temizleme kaldi. Onerilen siradaki is:
 Faz: Temel tarayici yuzeyleri | Modul: `core/browser_window.py` (BrowserTab
 sinifi + `_menu_style`) | Kapsam: context menu — geri/ileri/yenile, linki
 yeni sekmede ac, link adresini kopyala, sayfa kaynagi/inspect (ops.).
+
+Alternatif kucuk dilim: F2.6'nin kalan `todo`'su — sol sidebar'i ayni
+yogunluk diline gecirmek (bolum etiketleri kucult, satirlara hover-reveal,
+`HoverRevealRow` yeniden kullan).
 
 Neden:
 

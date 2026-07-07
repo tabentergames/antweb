@@ -305,6 +305,35 @@ class ConfirmDialog(QDialog):
         return dialog.exec() == QDialog.DialogCode.Accepted
 
 
+class HoverRevealRow(QFrame):
+    """Fare uzerindeyken eylem butonlarini gosteren satir (F2.6 panel deseni).
+
+    Kayitli butonlar gizli baslar; enter/leave ile gorunurluk degisir.
+    RetainSizeWhenHidden sayesinde satir genisligi hover'da ziplamamaz.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._reveal_widgets = []
+
+    def register(self, widget):
+        policy = widget.sizePolicy()
+        policy.setRetainSizeWhenHidden(True)
+        widget.setSizePolicy(policy)
+        widget.setVisible(False)
+        self._reveal_widgets.append(widget)
+
+    def enterEvent(self, event):  # noqa: N802
+        for widget in self._reveal_widgets:
+            widget.setVisible(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):  # noqa: N802
+        for widget in self._reveal_widgets:
+            widget.setVisible(False)
+        super().leaveEvent(event)
+
+
 class TabXPage(QWebEnginePage):
     """QWebEnginePage that routes tabx:// navigations back to the shell.
 
@@ -360,6 +389,7 @@ class BrowserWindow(QMainWindow):
         self.left_sidebar_open = False
         self.right_sidebar_open = False
         self._retired_profiles = []
+        self._collapsed_groups = set()
         self._load_ui_state()
         Theme.configure(self.theme_mode)
         Motion.configure(not self.reduced_motion)
@@ -722,17 +752,17 @@ class BrowserWindow(QMainWindow):
         # Aktif profil cipi: hangi profilde oldugun her zaman gorunur;
         # tiklayinca profil gecis menusu acilir.
         self.profile_chip = QPushButton()
-        self.profile_chip.setFixedHeight(36)
+        self.profile_chip.setFixedHeight(30)
         self.profile_chip.setStyleSheet(
             f"""
             QPushButton {{
-                border: 1px solid {Theme.purple};
-                border-radius: {Theme.RADIUS_LG}px;
+                border: none;
+                border-radius: 15px;
                 background-color: {Theme.purple_soft};
                 color: {Theme.purple};
                 font-size: 12px;
                 font-weight: 700;
-                padding: 0 {Theme.SPACE_LG}px;
+                padding: 0 {Theme.SPACE_MD}px;
             }}
             QPushButton::menu-indicator {{ width: 0px; }}
             QPushButton:hover {{
@@ -953,16 +983,18 @@ class BrowserWindow(QMainWindow):
         layout.setSpacing(12)
 
         ws_header = QHBoxLayout()
-        ws_title = QLabel("Çalışma Alanları")
-        ws_title.setStyleSheet(f"font-size: 14px; font-weight: 800; color: {Theme.text};")
+        ws_title = QLabel("Çalışma alanları")
+        ws_title.setStyleSheet(
+            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px;"
+        )
         ws_header.addWidget(ws_title)
         ws_header.addStretch(1)
         ws_add = self._icon_button("+", "Çalışma alanı ekle")
-        ws_add.setFixedSize(30, 30)
+        ws_add.setFixedSize(24, 24)
         ws_add.clicked.connect(lambda checked=False: self.add_workspace())
         ws_header.addWidget(ws_add)
         close = self._icon_button("×", "Sağ paneli kapat")
-        close.setFixedSize(30, 30)
+        close.setFixedSize(24, 24)
         close.clicked.connect(lambda checked=False: self.toggle_right_sidebar(False))
         ws_header.addWidget(close)
         layout.addLayout(ws_header)
@@ -974,25 +1006,29 @@ class BrowserWindow(QMainWindow):
         self._render_workspaces()
 
         header = QHBoxLayout()
-        title = QLabel("Sekme Grupları")
-        title.setStyleSheet(f"font-size: 14px; font-weight: 800; color: {Theme.text};")
+        title = QLabel("Sekme grupları")
+        title.setStyleSheet(
+            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px;"
+        )
         header.addWidget(title)
         header.addStretch(1)
         add = self._icon_button("+", "Grup ekle")
-        add.setFixedSize(30, 30)
+        add.setFixedSize(24, 24)
         add.clicked.connect(self.add_tab_group)
         header.addWidget(add)
         layout.addLayout(header)
 
         self.tab_groups_layout = QVBoxLayout()
         self.tab_groups_layout.setContentsMargins(0, 0, 0, 0)
-        self.tab_groups_layout.setSpacing(12)
+        self.tab_groups_layout.setSpacing(2)
         layout.addLayout(self.tab_groups_layout)
         self._render_tab_groups()
 
         layout.addStretch(1)
-        activity = QLabel("Son Aktiviteler")
-        activity.setStyleSheet(f"font-size: 13px; font-weight: 800; color: {Theme.text};")
+        activity = QLabel("Son aktiviteler")
+        activity.setStyleSheet(
+            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px;"
+        )
         layout.addWidget(activity)
         for item in ["TabX - yeni görsel kabuk", "GitHub oturumu", "Vaha.org"]:
             line = QLabel(item)
@@ -1200,46 +1236,79 @@ class BrowserWindow(QMainWindow):
         self.tabs.reset()
 
     def _render_workspaces(self):
+        """F2.6: workspace'ler yatay cip akisi — mor dolgu yalnizca aktifte.
+
+        Silme sag tik menusundedir (kalici × butonu gorsel gurultu yaratiyordu).
+        Qt'de hazir flow layout olmadigi icin cipler tahmini genislikle satirlara
+        elle sarilir.
+        """
         if not hasattr(self, "workspace_layout"):
             return
         self._clear_layout(self.workspace_layout)
+        available = self.RIGHT_SIDEBAR_WIDTH - 40
+        rows = []
+        current = None
+        used = 0
         for name in SessionStore.workspaces(self.profile_name):
-            row = QHBoxLayout()
-            pill = QPushButton(name)
-            pill.setFixedHeight(30)
-            pill.setCursor(Qt.CursorShape.PointingHandCursor)
             active = name == self.workspace
-            bg = Theme.purple_soft if active else Theme.panel_alt
-            color = Theme.purple if active else Theme.muted
-            pill.setStyleSheet(
-                f"""
-                QPushButton {{
-                    border: 1px solid {Theme.border_soft};
-                    border-radius: {Theme.RADIUS_SM}px;
-                    background-color: {bg};
-                    color: {color};
-                    font-size: 12px;
-                    font-weight: 750;
-                    text-align: left;
-                    padding-left: 10px;
-                }}
-                QPushButton:hover {{
-                    background-color: {Theme.purple_soft};
-                    color: {Theme.purple};
-                }}
+            chip = QPushButton(name)
+            chip.setFixedHeight(26)
+            chip.setCursor(Qt.CursorShape.PointingHandCursor)
+            if active:
+                chip_css = f"""
+                    QPushButton {{
+                        border: none;
+                        border-radius: 13px;
+                        background-color: {Theme.purple_soft};
+                        color: {Theme.purple};
+                        font-size: 12px;
+                        font-weight: 750;
+                        padding: 0 12px;
+                    }}
                 """
-            )
-            pill.clicked.connect(
+            else:
+                chip_css = f"""
+                    QPushButton {{
+                        border: 1px solid {Theme.border_soft};
+                        border-radius: 13px;
+                        background-color: transparent;
+                        color: {Theme.muted};
+                        font-size: 12px;
+                        font-weight: 650;
+                        padding: 0 12px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {Theme.panel_alt};
+                        color: {Theme.text};
+                    }}
+                """
+            chip.setStyleSheet(chip_css)
+            chip.clicked.connect(
                 lambda checked=False, ws=name: self.switch_workspace(ws)
             )
-            row.addWidget(pill, 1)
             if name != DEFAULT_WORKSPACE:
-                remove = self._mini_button("×", "Alanı sil")
-                remove.clicked.connect(
-                    lambda checked=False, ws=name: self.remove_workspace(ws)
+                chip.setToolTip("Sağ tık: alanı sil")
+                chip.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+                chip.customContextMenuRequested.connect(
+                    lambda pos, ws=name, btn=chip: self._workspace_context_menu(btn, pos, ws)
                 )
-                row.addWidget(remove)
+            estimated = 26 + 7 * len(name)
+            if current is None or used + estimated > available:
+                current = QHBoxLayout()
+                current.setSpacing(6)
+                rows.append(current)
+                used = 0
+            current.addWidget(chip)
+            used += estimated + 6
+        for row in rows:
+            row.addStretch(1)
             self.workspace_layout.addLayout(row)
+
+    def _workspace_context_menu(self, chip, pos, name):
+        menu = QMenu(chip)
+        menu.setStyleSheet(self._menu_style())
+        menu.addAction("Alanı sil", lambda ws=name: self.remove_workspace(ws))
+        menu.exec(chip.mapToGlobal(pos))
 
     def _rebuild_visual_shell(self):
         # Acik sekmeler kaybolmasin: oturumu kaydet, kabugu kur, geri yukle.
@@ -1367,13 +1436,35 @@ class BrowserWindow(QMainWindow):
         return self._icon_for(text)
 
     def _render_tab_groups(self):
+        """F2.6: kart yerine daraltilabilir bolum — chevron + hover-reveal eylemler."""
         if not hasattr(self, "tab_groups_layout"):
             return
         self._clear_layout(self.tab_groups_layout)
         for group_index, (group_name, items) in enumerate(self.tab_groups):
+            collapsed = group_name in self._collapsed_groups
             self.tab_groups_layout.addWidget(
-                self._tab_group_card(group_index, group_name, str(len(items)), items)
+                self._tab_group_header(group_index, group_name, len(items), collapsed)
             )
+            if collapsed:
+                continue
+            if not items:
+                empty = QLabel("Henüz sekme yok.")
+                empty.setStyleSheet(
+                    f"font-size: 11px; color: {Theme.subtle}; padding: 2px 0 4px 26px;"
+                )
+                self.tab_groups_layout.addWidget(empty)
+                continue
+            for item_index, (initials, label) in enumerate(items):
+                self.tab_groups_layout.addWidget(
+                    self._tab_group_item_row(group_index, item_index, initials, label)
+                )
+
+    def _toggle_group_collapsed(self, name):
+        if name in self._collapsed_groups:
+            self._collapsed_groups.discard(name)
+        else:
+            self._collapsed_groups.add(name)
+        self._render_tab_groups()
 
     def _clear_layout(self, layout):
         while layout.count():
@@ -1431,33 +1522,35 @@ class BrowserWindow(QMainWindow):
             item.mousePressEvent = handle_press
         return item
 
-    def _tab_group_card(self, group_index, name, count, items):
-        card = QFrame()
-        card.setObjectName("tabGroup")
-        card.setStyleSheet(
+    def _tab_group_header(self, group_index, name, count, collapsed):
+        row = HoverRevealRow()
+        row.setFixedHeight(30)
+        row.setCursor(Qt.CursorShape.PointingHandCursor)
+        row.setStyleSheet(
             f"""
-            QFrame#tabGroup {{
-                background-color: {Theme.card};
-                border: 1px solid {Theme.border_soft};
-                border-radius: 14px;
-            }}
+            QFrame {{ background-color: transparent; border-radius: 8px; }}
+            QFrame:hover {{ background-color: {Theme.panel_alt}; }}
             """
         )
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(7)
-        header = QHBoxLayout()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(4, 0, 4, 0)
+        layout.setSpacing(6)
+
+        chevron = QLabel("▸" if collapsed else "▾")
+        chevron.setFixedWidth(14)
+        chevron.setStyleSheet(f"font-size: 10px; color: {Theme.subtle}; background: transparent;")
         title = QLabel(name)
-        title.setStyleSheet(f"font-size: 12px; font-weight: 800; color: {Theme.text};")
-        badge = QLabel(count)
-        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        badge.setFixedSize(22, 20)
-        badge.setStyleSheet(
-            f"background-color: {Theme.panel_alt}; color: {Theme.muted}; border-radius: 8px; font-size: 11px;"
+        title.setStyleSheet(
+            f"font-size: 12px; font-weight: 800; color: {Theme.text}; background: transparent;"
         )
-        header.addWidget(title)
-        header.addStretch(1)
-        header.addWidget(badge)
+        badge = QLabel(str(count))
+        badge.setStyleSheet(
+            f"font-size: 11px; color: {Theme.subtle}; background: transparent;"
+        )
+        layout.addWidget(chevron)
+        layout.addWidget(title, 1)
+        layout.addWidget(badge)
+
         add_btn = self._mini_button("+", "Aktif sekmeyi bu gruba ekle")
         add_btn.clicked.connect(
             lambda checked=False, idx=group_index: self.add_current_tab_to_group(idx)
@@ -1466,53 +1559,70 @@ class BrowserWindow(QMainWindow):
         delete_btn.clicked.connect(
             lambda checked=False, idx=group_index: self.remove_tab_group(idx)
         )
-        header.addWidget(add_btn)
-        header.addWidget(delete_btn)
-        layout.addLayout(header)
-        if not items:
-            empty = QLabel("Henüz sekme yok.")
-            empty.setStyleSheet(f"font-size: 11px; color: {Theme.subtle}; padding: 2px 0;")
-            layout.addWidget(empty)
-            return card
+        layout.addWidget(add_btn)
+        layout.addWidget(delete_btn)
+        row.register(add_btn)
+        row.register(delete_btn)
 
-        for item_index, (initials, label) in enumerate(items):
-            row = QHBoxLayout()
-            fav = QLabel(self._display_icon(initials, label))
-            fav.setFixedSize(22, 22)
-            fav.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            fav.setStyleSheet(
-                f"""
-                background-color: {Theme.blue_soft};
-                color: {Theme.blue};
-                border-radius: 8px;
-                font-size: 9px;
-                font-weight: 800;
-                """
+        def handle_press(event, group=name):
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._toggle_group_collapsed(group)
+            QFrame.mousePressEvent(row, event)
+
+        row.mousePressEvent = handle_press
+        return row
+
+    def _tab_group_item_row(self, group_index, item_index, initials, label):
+        row = HoverRevealRow()
+        row.setFixedHeight(28)
+        row.setStyleSheet(
+            f"""
+            QFrame {{ background-color: transparent; border-radius: 8px; }}
+            QFrame:hover {{ background-color: {Theme.panel_alt}; }}
+            """
+        )
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(24, 0, 4, 0)
+        layout.setSpacing(8)
+
+        fav = QLabel(self._display_icon(initials, label))
+        fav.setFixedSize(18, 18)
+        fav.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        fav.setStyleSheet(
+            f"""
+            background-color: {Theme.blue_soft};
+            color: {Theme.blue};
+            border-radius: 6px;
+            font-size: 8px;
+            font-weight: 800;
+            """
+        )
+        text = QLabel(label)
+        text.setStyleSheet(f"font-size: 12px; color: {Theme.muted}; background: transparent;")
+        layout.addWidget(fav)
+        layout.addWidget(text, 1)
+
+        remove = self._mini_button("×", "Sekmeyi gruptan sil")
+        remove.clicked.connect(
+            lambda checked=False, gidx=group_index, iidx=item_index: self.remove_tab_from_group(
+                gidx, iidx
             )
-            text = QLabel(label)
-            text.setStyleSheet(f"font-size: 12px; color: {Theme.muted};")
-            row.addWidget(fav)
-            row.addWidget(text, 1)
-            remove = self._mini_button("×", "Sekmeyi gruptan sil")
-            remove.clicked.connect(
-                lambda checked=False, gidx=group_index, iidx=item_index: self.remove_tab_from_group(
-                    gidx, iidx
-                )
-            )
-            row.addWidget(remove)
-            layout.addLayout(row)
-        return card
+        )
+        layout.addWidget(remove)
+        row.register(remove)
+        return row
 
     def _mini_button(self, label, tooltip):
+        # F2.6: hayalet mini buton — hover-reveal satirlarinda kullanilir.
         btn = QPushButton(label)
         btn.setToolTip(tooltip)
-        btn.setFixedSize(22, 22)
+        btn.setFixedSize(20, 20)
         btn.setStyleSheet(
             f"""
             QPushButton {{
-                border: 1px solid {Theme.border_soft};
-                border-radius: 8px;
-                background-color: {Theme.panel_alt};
+                border: none;
+                border-radius: 6px;
+                background-color: transparent;
                 color: {Theme.muted};
                 font-size: 10px;
                 font-weight: 900;
@@ -1520,29 +1630,33 @@ class BrowserWindow(QMainWindow):
             QPushButton:hover {{
                 background-color: {Theme.purple_soft};
                 color: {Theme.purple};
-                border-color: #d9d0ff;
             }}
             """
         )
         return btn
 
     def _icon_button(self, label, tooltip):
+        # F2.6: kenarliksiz ikon butonu — cerceve yok, hover'da hafif zemin.
+        # Adres cubugu toolbar'daki tek cerceveli eleman olarak kalir.
         btn = QPushButton(label)
         btn.setToolTip(tooltip)
         btn.setFixedSize(36, 36)
         btn.setStyleSheet(
             f"""
             QPushButton {{
-                border: 1px solid {Theme.border};
-                border-radius: 12px;
-                background-color: {Theme.button};
+                border: none;
+                border-radius: 10px;
+                background-color: transparent;
                 color: {Theme.muted};
-                font-size: 12px;
+                font-size: 13px;
                 font-weight: 800;
             }}
             QPushButton:hover {{
                 background-color: {Theme.panel_alt};
                 color: {Theme.text};
+            }}
+            QPushButton:pressed {{
+                background-color: {Theme.border_soft};
             }}
             QPushButton::menu-indicator {{ width: 0px; }}
             """
@@ -2026,6 +2140,38 @@ class BrowserWindow(QMainWindow):
               background: rgba(24,160,88,.08);
               border-color: rgba(24,160,88,.18);
             }
+            .switch-list { margin-top: 14px; }
+            .switch-list a + a { border-top: 1px solid var(--line); }
+            .switch-row {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 12px;
+              padding: 10px 0;
+              text-decoration: none;
+              color: var(--text);
+              font-size: 13px;
+              font-weight: 650;
+            }
+            .switch {
+              flex: none;
+              width: 38px;
+              height: 22px;
+              border-radius: 999px;
+              background: var(--line);
+              position: relative;
+            }
+            .switch.on { background: var(--purple); }
+            .switch .knob {
+              position: absolute;
+              top: 3px;
+              left: 3px;
+              width: 16px;
+              height: 16px;
+              border-radius: 50%;
+              background: var(--card);
+            }
+            .switch.on .knob { left: 19px; }
             @media (max-width: 760px) {
               main { width: calc(100vw - 34px); padding: 30px 0; }
               .grid { grid-template-columns: 1fr; }
@@ -2044,21 +2190,28 @@ class BrowserWindow(QMainWindow):
             .replace("__BUTTON__", Theme.button)
         )
 
+    def _switch_row_html(self, label, enabled, href):
+        """Ayar satiri: etiket solda, durum+eylemi birlestiren anahtar sagda."""
+        state = "on" if enabled else ""
+        return (
+            f'<a class="switch-row" href="{href}">'
+            f"<span>{label}</span>"
+            f'<span class="switch {state}"><span class="knob"></span></span></a>'
+        )
+
     def _settings_page_html(self):
         theme_label = "Koyu tema aktif" if self.theme_mode == "dark" else "Açık tema aktif"
         tab_position_label = (
             "Sekmeler altta" if self.tab_position == "bottom" else "Sekmeler üstte"
         )
-        motion_label = (
-            "Animasyonlar azaltıldı" if self.reduced_motion else "Animasyonlar açık"
+        motion_switch = self._switch_row_html(
+            "Animasyonları azalt", self.reduced_motion, "tabx://settings/reduced-motion"
         )
-        motion_action_label = (
-            "Animasyonları aç" if self.reduced_motion else "Animasyonları azalt"
+        privacy_switches = self._switch_row_html(
+            "Ad/tracker blocker", self.ad_block_enabled, "tabx://settings/ad-block"
+        ) + self._switch_row_html(
+            "HTTPS upgrade", self.https_upgrade_enabled, "tabx://settings/https-upgrade"
         )
-        ad_block_label = "Ad/tracker blocker açık" if self.ad_block_enabled else "Ad/tracker blocker kapalı"
-        ad_block_action_label = "Kapat" if self.ad_block_enabled else "Aç"
-        https_upgrade_label = "HTTPS upgrade açık" if self.https_upgrade_enabled else "HTTPS upgrade kapalı"
-        https_upgrade_action_label = "Kapat" if self.https_upgrade_enabled else "Aç"
         permission_options = [
             ("ask", "Her seferinde sor"),
             ("allow", "Her zaman izin ver"),
@@ -2115,10 +2268,7 @@ class BrowserWindow(QMainWindow):
               <article class="card">
                 <h2>Hareket</h2>
                 <p>Panel, sekme ve fan geçiş animasyonlarını tek yerden aç/kapat. Tercih kalıcıdır.</p>
-                <div class="pill-row">
-                  <span class="pill status">{motion_label}</span>
-                  <a class="pill" style="text-decoration:none;" href="tabx://settings/reduced-motion">{motion_action_label}</a>
-                </div>
+                <div class="switch-list">{motion_switch}</div>
               </article>
               <article class="card">
                 <h2>Sekmeler</h2>
@@ -2139,15 +2289,8 @@ class BrowserWindow(QMainWindow):
               </article>
               <article class="card">
                 <h2>Gizlilik</h2>
-                <p>Ad/tracker blocker ve HTTPS upgrade burada aç/kapat edilir; izinler ve site verisi temizleme sonraki dilim.</p>
-                <div class="pill-row">
-                  <span class="pill status">{ad_block_label}</span>
-                  <a class="pill" style="text-decoration:none;" href="tabx://settings/ad-block">{ad_block_action_label}</a>
-                </div>
-                <div class="pill-row">
-                  <span class="pill status">{https_upgrade_label}</span>
-                  <a class="pill" style="text-decoration:none;" href="tabx://settings/https-upgrade">{https_upgrade_action_label}</a>
-                </div>
+                <p>İstek engelleme ve HTTPS yükseltme koruması; site verisi temizleme sonraki dilim.</p>
+                <div class="switch-list">{privacy_switches}</div>
               </article>
               <article class="card">
                 <h2>İzinler</h2>

@@ -261,6 +261,18 @@ def run() -> int:
         window.close_current_tab()
     assert window.tabs.count() == kb_before, "kisayol testi sekmeleri kapanmadi"
 
+    # F2.6 — panel yogunluk: grup daraltma + settings switch bileseni.
+    first_group = window.tab_groups[0][0]
+    window._toggle_group_collapsed(first_group)
+    assert first_group in window._collapsed_groups, "grup daraltilmadi"
+    window._toggle_group_collapsed(first_group)
+    assert first_group not in window._collapsed_groups, "grup acilmadi"
+    settings_html = window._settings_page_html()
+    assert 'class="switch on"' in settings_html or 'class="switch "' in settings_html, (
+        "settings switch bileseni yok"
+    )
+    assert "Ad/tracker blocker" in settings_html, "gizlilik switch etiketi yok"
+
     # F2.5 — tab strip ekle/kapat: once reduced-motion yolu (deterministik).
     before = window.tabs.count()
     window.add_new_tab()
