@@ -4,6 +4,22 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **Downloads sayfasi tamamlandi (2026-07-07):** `features/downloads/manager.py`
+  (`DownloadManager`) + `tabx://downloads` ic sayfasi + `⋯` menusunde giris.
+  Kritik kararlar: (1) `DownloadManager` `BrowserWindow.__init__`'de
+  `_setup_web_profile`'dan ONCE bir kez olusturulur ve her profil kurulumunda
+  `attach_profile` ile yeni profile baglanir — indirme kayitlari profil
+  gecisinde KORUNUR (PrivacyService gibi profil basina yeniden yaratilmaz);
+  bu siralamayi bozma. (2) Kayitlar oturum ici (in-memory dict, kendi id
+  sayacimizla — `request.id()` profil basina oldugu icin kullanilmadi);
+  kalici SQLite gecmisi bilincli olarak sonraki dilime birakildi.
+  (3) Sayfa statik HTML — ilerleme canli akmaz, "Yenile" linki
+  (`tabx://downloads/refresh`) yeniden yukler; `_handle_internal_url`'deki
+  "ayni sayfa + bos action = yut" korumasi yuzunden refresh AYRI BIR ACTION
+  olarak eklendi, duz `tabx://downloads` linki calismaz. Canli ilerleme
+  (changed sinyali -> acik downloads sekmelerini yenile) sonraki dilim.
+  (4) Smoke test sahte istek nesnesi (`_FakeDownloadRequest`) kullanir —
+  gercek `QWebEngineDownloadRequest` disaridan olusturulamaz.
 - **F3 izin paneli tamamlandi (2026-07-07):** `QWebEnginePermission` tabanli
   YENI Qt 6.8+ API kullanildi (`page().permissionRequested(QWebEnginePermission)`),
   eski `featurePermissionRequested`/`setFeaturePermission`/`Feature` enum'u
@@ -115,38 +131,40 @@ Son guncelleme: 2026-07-07
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-F3'un tum `next`/`todo` dilimlerinden yalnizca "Site veri temizleme" kaldi;
-F2.5'te de yalnizca dusuk oncelikli arastirma gorevleri (cikis/giris sayfa
-gecisi, frameless kabuk) var. En degerli somut is artik "Temel tarayici
-yuzeyleri" tablosunda `next` isaretli Downloads sayfasi:
+Downloads sayfasi tamamlandi. "Temel tarayici yuzeyleri" tablosunda kalan en
+degerli dilimler: context menu, klavye kisayollari, sekme favicon'lari, error
+page. F3'te yalnizca site veri temizleme kaldi. Onerilen siradaki is:
 
-Faz: Temel tarayici yuzeyleri | Modul: `features/downloads/` (yeni), `core/browser_window.py`
-(`_setup_web_profile`, `_settings_page_html` veya yeni `tabx://downloads` route'u) |
-Kapsam: indirme listesi, duraklat/devam, klasorde goster.
+Faz: Temel tarayici yuzeyleri | Modul: `core/browser_window.py` (veya `ui/` altina
+yeni modul) | Kapsam: klavye kisayollari — yeni sekme (Cmd+T), sekme kapat (Cmd+W),
+yenile (Cmd+R), adres cubuguna odak (Cmd+L), sekmeler arasi gecis (Ctrl+Tab /
+Cmd+1..9), indirilenler/gecmis/favoriler sayfalarina kisayol (ops.).
 
 Neden:
 
-- `QWebEngineProfile.downloadRequested(QWebEngineDownloadRequest)` sinyali su an
-  hicbir yerde baglanmamis; varsayilan Chromium davranisi (indirmeyi sessizce
-  reddetmesi ya da native OS dialogu) kullaniciya kontrol vermiyor.
-- History/Bookmarks deseni (SQLite store + `tabx://` ic sayfa + komut linki)
-  buraya da tasinabilir; izin panelindeki "yeni sinyale baglan + tabx sayfasi"
-  deseni de taze ornek.
+- Kucuk, bagimsiz, kullanici degeri yuksek bir dilim; QShortcut/QKeySequence
+  ile mevcut metodlara (add_new_tab, close_tab, reload, address_bar.setFocus)
+  dogrudan baglanir — yeni state gerektirmez.
+- macOS'ta Cmd standarttir; `QKeySequence.StandardKey` kullanimi platform
+  farkini otomatik cozer (StandardKey.AddTab, Close, Refresh vb.).
 
 Net teslim kriteri:
 
-- Her profil kurulumunda (`_setup_web_profile`) `downloadRequested`'a baglanan
-  bir handler; indirmeyi `accept()`'ler ve hedef klasoru/ilerlemeyi izler.
-- `tabx://downloads` ic sayfasi: liste, durum (devam ediyor/tamamlandi/basarisiz),
-  "klasorde goster" komut linki.
-- Toolbar'da indirme aktifken/tamamlaninca fark edilir bir gosterge (ops.).
+- Yukaridaki cekirdek kisayollar calisiyor; mevcut davranislarla cakisma yok
+  (ozellikle webview odaktayken Cmd+L adres cubuguna gecebilmeli).
+- Smoke test'te en az "kisayol nesneleri olusturuldu + slot'lar dogru metoda
+  bagli" duzeyinde dogrulama.
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
 
 Paralel yurutulebilir ikinci gorev (farkli dosyalar): F3 | Modul:
-`core/browser_window.py` (`_settings_page_html`, yeni sayfa) | Kapsam: site
-verisi temizleme — cache/cookie/local storage icin `QWebEngineProfile.clearHttpCache()`
-ve `profile.cookieStore().deleteAllCookies()` gibi API'lere baglanan bir buton;
-"Gizlilik" kartina veya ayri bir alt bolume eklenebilir.
+`core/browser_window.py` (`_settings_page_html`) | Kapsam: site verisi
+temizleme — `QWebEngineProfile.clearHttpCache()` +
+`profile.cookieStore().deleteAllCookies()` cagiran bir "Gizlilik" karti komutu.
+
+Downloads icin birikmis kucuk iyilestirmeler (istenirse ayri dilim):
+kalici indirme gecmisi (SQLite, history/bookmarks deseni), canli ilerleme
+(changed sinyali -> acik downloads sekmesini yenile), toolbar'da aktif
+indirme gostergesi.
 
 ## Teslim notu formati
 

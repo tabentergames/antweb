@@ -171,6 +171,75 @@ def run() -> int:
     assert window.permission_mode == "allow", "settings komutu permission_mode degistirmedi"
     window.set_permission_mode("ask")
 
+    # Downloads — sahte istek nesnesiyle kabul/izleme/komut akisi.
+    from PyQt6.QtWebEngineCore import QWebEngineDownloadRequest
+
+    class _FakeSignal:
+        def connect(self, *_args):
+            pass
+
+    class _FakeDownloadRequest:
+        def __init__(self):
+            self.accepted = False
+            self.paused = False
+            self.cancelled = False
+            self.directory = ""
+            self.stateChanged = _FakeSignal()
+            self._state = QWebEngineDownloadRequest.DownloadState.DownloadInProgress
+
+        def setDownloadDirectory(self, directory):
+            self.directory = directory
+
+        def accept(self):
+            self.accepted = True
+
+        def pause(self):
+            self.paused = True
+
+        def resume(self):
+            self.paused = False
+
+        def cancel(self):
+            self.cancelled = True
+            self._state = QWebEngineDownloadRequest.DownloadState.DownloadCancelled
+
+        def state(self):
+            return self._state
+
+        def downloadFileName(self):
+            return "ornek.zip"
+
+        def downloadDirectory(self):
+            return self.directory
+
+        def url(self):
+            return QUrl("https://example.com/ornek.zip")
+
+        def totalBytes(self):
+            return 2048
+
+        def receivedBytes(self):
+            return 1024
+
+        def isPaused(self):
+            return self.paused
+
+    fake_request = _FakeDownloadRequest()
+    window.downloads._on_download_requested(fake_request)
+    assert fake_request.accepted, "indirme istegi accept edilmedi"
+    entries = window.downloads.entries()
+    assert len(entries) == 1 and entries[0]["file_name"] == "ornek.zip", "indirme kaydi izlenmedi"
+    assert entries[0]["in_progress"], "indirme durumu yanlis"
+
+    entry_id = entries[0]["id"]
+    window._handle_internal_url(window.current_view, QUrl(f"tabx://downloads/pause?id={entry_id}"))
+    assert fake_request.paused, "downloads/pause komutu calismadi"
+    window._handle_internal_url(window.current_view, QUrl(f"tabx://downloads/resume?id={entry_id}"))
+    assert not fake_request.paused, "downloads/resume komutu calismadi"
+    window._handle_internal_url(window.current_view, QUrl(f"tabx://downloads/cancel?id={entry_id}"))
+    assert fake_request.cancelled, "downloads/cancel komutu calismadi"
+    assert "ornek.zip" in window._internal_page_html("downloads"), "downloads sayfasi kaydi gostermiyor"
+
     # F2.5 — tab strip ekle/kapat: once reduced-motion yolu (deterministik).
     before = window.tabs.count()
     window.add_new_tab()

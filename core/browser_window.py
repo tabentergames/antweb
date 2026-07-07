@@ -22,6 +22,7 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 
 # F3 privacy layer
 from features.privacy.service import PrivacyService
+from features.downloads.manager import DownloadManager
 from features.library.store import BookmarkStore, HistoryStore
 from core.session import DEFAULT_WORKSPACE, SessionStore
 from ui.motion import Motion, animate, slide_panel, snapshot_of
@@ -361,6 +362,8 @@ class BrowserWindow(QMainWindow):
         self._load_ui_state()
         Theme.configure(self.theme_mode)
         Motion.configure(not self.reduced_motion)
+        # Indirmeler oturum kapsaminda tutulur; profil gecisinde korunur.
+        self.downloads = DownloadManager(self)
         self._setup_web_profile()
 
         app = QApplication.instance()
@@ -383,6 +386,7 @@ class BrowserWindow(QMainWindow):
         self.privacy = PrivacyService(profile)
         self.privacy.set_ad_block_enabled(self.ad_block_enabled)
         self.privacy.set_https_upgrade_enabled(self.https_upgrade_enabled)
+        self.downloads.attach_profile(profile)
         self.history = HistoryStore(self.profile_name)
         self.bookmarks = BookmarkStore(self.profile_name)
         self.workspace = SessionStore.active_workspace(self.profile_name)
@@ -705,6 +709,7 @@ class BrowserWindow(QMainWindow):
         more_menu = QMenu(more_btn)
         more_menu.setStyleSheet(self._menu_style())
         more_menu.addAction("⇅  Sekmeleri üste/alta al", self.toggle_tab_position)
+        more_menu.addAction("⬇  İndirilenler", lambda: self.open_internal_page("downloads"))
         more_menu.addAction("⚙  Ayarlar", lambda: self.open_internal_page("settings"))
         more_menu.addAction("?  Hakkında", lambda: self.open_internal_page("about"))
         more_btn.setMenu(more_menu)
@@ -1725,7 +1730,7 @@ class BrowserWindow(QMainWindow):
             return
         self._load_internal_page(self.current_view, page_key)
 
-    INTERNAL_PAGES = {"newtab", "settings", "about", "history", "bookmarks"}
+    INTERNAL_PAGES = {"newtab", "settings", "about", "history", "bookmarks", "downloads"}
 
     def _load_internal_page(self, view, page_key):
         page_key = page_key if page_key in self.INTERNAL_PAGES else "newtab"
@@ -1753,6 +1758,7 @@ class BrowserWindow(QMainWindow):
             "about": "Hakkında",
             "history": "Geçmiş",
             "bookmarks": "Favoriler",
+            "downloads": "İndirilenler",
         }.get(page_key, "Yeni Sekme")
 
     def _internal_page_html(self, page_key):
@@ -1764,6 +1770,8 @@ class BrowserWindow(QMainWindow):
             return self._history_page_html()
         if page_key == "bookmarks":
             return self._bookmarks_page_html()
+        if page_key == "downloads":
+            return self._downloads_page_html()
         return self._new_tab_html()
 
     def _handle_internal_url(self, view, url):
@@ -1786,6 +1794,20 @@ class BrowserWindow(QMainWindow):
             if entry_id.isdigit():
                 self.bookmarks.remove_by_id(int(entry_id))
             self._load_internal_page(view, "bookmarks")
+            return
+        if key == "downloads" and action in {"pause", "resume", "cancel", "show", "refresh"}:
+            entry_id = query.queryItemValue("id")
+            if entry_id.isdigit():
+                entry_id = int(entry_id)
+                if action == "pause":
+                    self.downloads.pause(entry_id)
+                elif action == "resume":
+                    self.downloads.resume(entry_id)
+                elif action == "cancel":
+                    self.downloads.cancel(entry_id)
+                elif action == "show":
+                    self.downloads.open_folder(entry_id)
+            self._load_internal_page(view, "downloads")
             return
         if key == "settings" and action == "profile":
             name = query.queryItemValue("name").strip()
@@ -2253,6 +2275,70 @@ class BrowserWindow(QMainWindow):
             <p class="eyebrow">TabX İç Sayfa</p>
             <h1>Favoriler</h1>
             <p class="subtitle">'{html_module.escape(self.profile_name)}' profilinin kayıtlı favorileri.</p>
+            <section class="rows">{body}</section>
+          </main>
+        </body>
+        </html>
+        """
+
+    def _downloads_page_html(self):
+        rows = []
+        for entry in self.downloads.entries():
+            safe_name = html_module.escape(entry["file_name"] or entry["url"])
+            safe_url = html_module.escape(entry["url"], quote=True)
+            actions = []
+            if entry["in_progress"]:
+                if entry["is_paused"]:
+                    actions.append(
+                        f'<a class="action" href="tabx://downloads/resume?id={entry["id"]}">Devam et</a>'
+                    )
+                else:
+                    actions.append(
+                        f'<a class="action" href="tabx://downloads/pause?id={entry["id"]}">Duraklat</a>'
+                    )
+                actions.append(
+                    f'<a class="action" href="tabx://downloads/cancel?id={entry["id"]}">İptal</a>'
+                )
+            if entry["completed"]:
+                actions.append(
+                    f'<a class="action" href="tabx://downloads/show?id={entry["id"]}">Klasörde göster</a>'
+                )
+            state_text = entry["state_label"]
+            if entry["in_progress"] and entry["is_paused"]:
+                state_text = "Duraklatıldı"
+            if entry["progress"]:
+                state_text += f" · {entry['progress']}"
+            rows.append(
+                f'<div class="row"><span class="link">{safe_name}</span>'
+                f'<span class="url">{safe_url}</span>'
+                f'<span class="time">{state_text}</span>'
+                f'{"".join(actions)}</div>'
+            )
+        body = (
+            "\n".join(rows)
+            if rows
+            else '<p class="empty">Bu oturumda henüz indirme yok.</p>'
+        )
+        refresh_row = (
+            '<div class="toolbar-row"><a href="tabx://downloads/refresh">Yenile</a></div>'
+            if rows
+            else ""
+        )
+        return f"""
+        <!doctype html>
+        <html lang="tr">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>İndirilenler</title>
+          <style>{self._internal_page_base_css()}{self._list_page_row_css()}</style>
+        </head>
+        <body>
+          <main>
+            <p class="eyebrow">TabX İç Sayfa</p>
+            <h1>İndirilenler</h1>
+            <p class="subtitle">Bu oturumdaki indirmeler. Kayıtlar uygulama kapanınca sıfırlanır.</p>
+            {refresh_row}
             <section class="rows">{body}</section>
           </main>
         </body>

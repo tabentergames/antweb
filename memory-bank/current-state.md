@@ -23,6 +23,7 @@ Son guncelleme: 2026-07-07
   - **F3 — Ad/tracker blocker:** `features/privacy/ad_blocker.py` — QWebEngineUrlRequestInterceptor ile ~50 domain icin subdomain-destekli engelleme; `set_enabled`/`is_enabled` ile ac/kapat destekler.
   - **F3 — HTTPS upgrade:** `features/privacy/https_upgrade.py` — HTTP isteklerini HTTPS'e yonlendirir; localhost/127.0.0.1 muaf; `set_enabled` ile ac/kapat destekler.
   - **F3 — Gizlilik ayar toggle'lari:** `tabx://settings` "Gizlilik" karti — ad blocker ve HTTPS upgrade `PrivacyService.set_ad_block_enabled`/`set_https_upgrade_enabled` uzerinden ac/kapat edilir; tercih `UiStateStore`'da (`ad_block_enabled`, `https_upgrade_enabled`), her profil gecisinde (`_setup_web_profile`) yeniden uygulanir.
+  - **Downloads:** `features/downloads/manager.py` (`DownloadManager`) — her profil kurulumunda `downloadRequested`'a baglanir, indirmeyi varsayilan indirme klasorune `accept()` eder, oturum boyunca izler (profil gecisinde kayitlar korunur, kapaninca sifirlanir). `tabx://downloads` ic sayfasi: durum + boyut/ilerleme, duraklat/devam/iptal/klasorde goster/yenile komut linkleri (`tabx://downloads/pause?id=` vb.); toolbar `⋯` menusunde "İndirilenler" girisi.
   - **F3 — Izin paneli:** her yeni sekmede `page().permissionRequested` -> `BrowserWindow._handle_permission_request`; global `permission_mode` ("ask"/"allow"/"block", varsayilan "ask") `tabx://settings` "Izinler" kartinda 3 secenekli pill grubu ile degistirilir, `data/ui_state.json`'a yazilir. Kamera/mikrofon/konum/bildirim (`QWebEnginePermission.PermissionType`) kapsar; "ask" modunda `ConfirmDialog.ask(..., cancel_label="Reddet", confirm_label="İzin ver")` kullanicidan karar ister.
   - **F3 — Extension runtime:** `features/extensions/runtime.py` — manifest.json tabanli JS/CSS injection; `data/extensions/` klasorunden yuklenir.
   - F3 bilesenleri `BrowserWindow._setup_privacy_layer()` ile default QWebEngineProfile'a baglanmis durumda.
@@ -52,7 +53,7 @@ Son guncelleme: 2026-07-07
 - `assets/`, `tests/` hedef klasorleri henuz kurulmus degil.
 - Fan sekme modu yok; F2 tamamlanma kriteri esnek sekme konumu ile karsilandi.
 - F3 gizlilik ozelliklerinin ac/kapat toggle'lari ve izin paneli var; site verisi temizleme hala yok. Izin karari per-origin hatirlanmiyor — her istek global `permission_mode`'a gore degerlendirilir.
-- Downloads, context menu, klavye kisayollari ve error page yok (bkz. backlog "Temel tarayici yuzeyleri").
+- Context menu, klavye kisayollari ve error page yok (bkz. backlog "Temel tarayici yuzeyleri"); downloads sayfasi var ama kayitlar oturum ici (kalici degil) ve ilerleme canli guncellenmiyor (sayfa "Yenile" ile tazelenir).
 - History'de arama/filtre, bookmark'ta etiket/klasor yok; ilk dilim bilincli olarak sade.
 - Test paketi olarak yalnizca `scripts/smoke_test.py` var; `tests/` altinda state-store ve motion testleri eklenmeli.
 - Tab strip artik Motion tokenlarini kullaniyor; toolbar ve dialoglar ile tab strip'in SPACE/RADIUS geometri degerleri hala ciplak (kademeli goc surecek); glass yuzey gecisi siradaki F2.5 dilimi.
