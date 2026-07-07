@@ -17,6 +17,7 @@ from pathlib import Path
 os.environ["QT_WEBENGINE_CHROMIUM_FLAGS"] = "--enable-features=NetworkService"
 
 from PyQt6.QtCore import QPoint, Qt, QTimer, QUrl, QUrlQuery, pyqtSignal
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings, QWebEngineProfile
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 
@@ -371,6 +372,7 @@ class BrowserWindow(QMainWindow):
             app.setStyleSheet(Theme.qss)
 
         self.setCentralWidget(self._build_main_shell())
+        self._setup_shortcuts()
         self._restore_session()
 
     def _setup_web_profile(self):
@@ -1723,6 +1725,64 @@ class BrowserWindow(QMainWindow):
     def reload_page(self):
         if self.current_view and hasattr(self.current_view, "reload"):
             self.current_view.reload()
+
+    # ------------------------------------------------------------------
+    # Klavye kisayollari
+    # ------------------------------------------------------------------
+
+    def _setup_shortcuts(self):
+        """Cekirdek klavye kisayollari.
+
+        StandardKey platform farkini cozer (macOS'ta Ctrl -> Cmd esleme Qt'de
+        otomatiktir). "Meta+Tab" macOS'ta fiziksel Ctrl+Tab'dir — Safari/Chrome
+        sekme gecisi kalibi; Cmd+Tab OS uygulama degistiriciyle cakisir.
+        """
+        bindings = [
+            (QKeySequence(QKeySequence.StandardKey.AddTab), lambda: self.add_new_tab()),
+            (QKeySequence(QKeySequence.StandardKey.Close), self.close_current_tab),
+            (QKeySequence(QKeySequence.StandardKey.Refresh), self.reload_page),
+            (QKeySequence(QKeySequence.StandardKey.Back), self.go_back),
+            (QKeySequence(QKeySequence.StandardKey.Forward), self.go_forward),
+            (QKeySequence("Ctrl+L"), self.focus_address_bar),
+            (QKeySequence("Meta+Tab"), lambda: self.cycle_tab(1)),
+            (QKeySequence("Meta+Shift+Tab"), lambda: self.cycle_tab(-1)),
+            (QKeySequence("Ctrl+Y"), lambda: self.open_internal_page("history")),
+            (QKeySequence("Ctrl+Shift+J"), lambda: self.open_internal_page("downloads")),
+        ]
+        for number in range(1, 10):
+            bindings.append(
+                (QKeySequence(f"Ctrl+{number}"), lambda n=number: self.activate_tab_number(n))
+            )
+        self._shortcuts = []
+        for sequence, slot in bindings:
+            shortcut = QShortcut(sequence, self)
+            # Webview odaktayken de calismali; window-context bazi durumlarda
+            # render process'e yenik dusuyor.
+            shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            shortcut.activated.connect(slot)
+            self._shortcuts.append(shortcut)
+
+    def close_current_tab(self):
+        self.close_tab(self.tabs.currentIndex())
+
+    def focus_address_bar(self):
+        self.address_bar.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        self.address_bar.selectAll()
+
+    def cycle_tab(self, step):
+        count = self.tabs.count()
+        if count < 2:
+            return
+        self.tabs.setCurrentIndex((self.tabs.currentIndex() + step) % count)
+
+    def activate_tab_number(self, number):
+        count = self.tabs.count()
+        if count == 0:
+            return
+        # Tarayici kalibi: 9 her zaman son sekme.
+        index = count - 1 if number == 9 else number - 1
+        if index < count:
+            self.tabs.setCurrentIndex(index)
 
     def open_internal_page(self, page_key):
         if not self.current_view:

@@ -4,6 +4,18 @@ Son guncelleme: 2026-07-07
 
 ## Son kararlar
 
+- **Klavye kisayollari tamamlandi (2026-07-07):** `_setup_shortcuts` —
+  `__init__`'de `_build_main_shell`'den SONRA cagrilir (address_bar/tabs'a
+  ihtiyac duyar). Kritik kararlar: (1) `ApplicationShortcut` context kullanildi
+  — window-context QShortcut'lar QWebEngineView odaktayken bazen render
+  process'e yenik dusuyor. (2) Sekme dongusu "Meta+Tab" olarak tanimli:
+  Qt macOS'ta Ctrl<->Cmd degistirir, yani QKeySequence("Ctrl+Tab") fiziksel
+  Cmd+Tab olur ve OS uygulama degistiriciyle cakisir; "Meta+Tab" fiziksel
+  Ctrl+Tab'a denk gelir (Safari/Chrome kalibi). Bu esleme tuzagina dikkat.
+  (3) Cmd+1..9'da 9 her zaman SON sekmeye gider (tarayici konvansiyonu).
+  (4) `tabs.setCurrentIndex` `tabActivated` sinyalini emit ettigi icin
+  `cycle_tab`/`activate_tab_number` sadece index set eder — view gecisi
+  mevcut `handle_tab_activated` yolundan akar, snapshot animasyonu dahil.
 - **Downloads sayfasi tamamlandi (2026-07-07):** `features/downloads/manager.py`
   (`DownloadManager`) + `tabx://downloads` ic sayfasi + `⋯` menusunde giris.
   Kritik kararlar: (1) `DownloadManager` `BrowserWindow.__init__`'de
@@ -131,29 +143,27 @@ Son guncelleme: 2026-07-07
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-Downloads sayfasi tamamlandi. "Temel tarayici yuzeyleri" tablosunda kalan en
-degerli dilimler: context menu, klavye kisayollari, sekme favicon'lari, error
-page. F3'te yalnizca site veri temizleme kaldi. Onerilen siradaki is:
+Klavye kisayollari ve Downloads tamamlandi. "Temel tarayici yuzeyleri"nde
+kalan dilimler: context menu, sekme favicon'lari, error page. F3'te yalnizca
+site veri temizleme kaldi. Onerilen siradaki is:
 
-Faz: Temel tarayici yuzeyleri | Modul: `core/browser_window.py` (veya `ui/` altina
-yeni modul) | Kapsam: klavye kisayollari — yeni sekme (Cmd+T), sekme kapat (Cmd+W),
-yenile (Cmd+R), adres cubuguna odak (Cmd+L), sekmeler arasi gecis (Ctrl+Tab /
-Cmd+1..9), indirilenler/gecmis/favoriler sayfalarina kisayol (ops.).
+Faz: Temel tarayici yuzeyleri | Modul: `core/browser_window.py` (BrowserTab
+sinifi + `_menu_style`) | Kapsam: context menu — geri/ileri/yenile, linki
+yeni sekmede ac, link adresini kopyala, sayfa kaynagi/inspect (ops.).
 
 Neden:
 
-- Kucuk, bagimsiz, kullanici degeri yuksek bir dilim; QShortcut/QKeySequence
-  ile mevcut metodlara (add_new_tab, close_tab, reload, address_bar.setFocus)
-  dogrudan baglanir — yeni state gerektirmez.
-- macOS'ta Cmd standarttir; `QKeySequence.StandardKey` kullanimi platform
-  farkini otomatik cozer (StandardKey.AddTab, Close, Refresh vb.).
+- `QWebEngineView.contextMenuEvent` override (veya `createStandardContextMenu`
+  ozellestirme) ile yapilir; `_menu_style()` token-bazli QMenu stili hazir.
+- "Linki yeni sekmede ac" icin `page().contextMenuData()` yerine Qt6'da
+  `lastContextMenuRequest()` kullanilir (QWebEngineContextMenuRequest) —
+  API adina dikkat.
 
 Net teslim kriteri:
 
-- Yukaridaki cekirdek kisayollar calisiyor; mevcut davranislarla cakisma yok
-  (ozellikle webview odaktayken Cmd+L adres cubuguna gecebilmeli).
-- Smoke test'te en az "kisayol nesneleri olusturuldu + slot'lar dogru metoda
-  bagli" duzeyinde dogrulama.
+- Sag tik menusu TabX temasiyla gorunur (native menu degil); geri/ileri/yenile
+  + linki yeni sekmede ac + adres kopyala calisiyor.
+- Ic sayfalarda (tabx://) da patlamiyor.
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
 
 Paralel yurutulebilir ikinci gorev (farkli dosyalar): F3 | Modul:
@@ -161,10 +171,9 @@ Paralel yurutulebilir ikinci gorev (farkli dosyalar): F3 | Modul:
 temizleme — `QWebEngineProfile.clearHttpCache()` +
 `profile.cookieStore().deleteAllCookies()` cagiran bir "Gizlilik" karti komutu.
 
-Downloads icin birikmis kucuk iyilestirmeler (istenirse ayri dilim):
-kalici indirme gecmisi (SQLite, history/bookmarks deseni), canli ilerleme
-(changed sinyali -> acik downloads sekmesini yenile), toolbar'da aktif
-indirme gostergesi.
+Birikmis kucuk iyilestirmeler (istenirse ayri dilimler): kalici indirme
+gecmisi (SQLite), downloads canli ilerleme, toolbar indirme gostergesi,
+ayarlanabilir kisayollar, sekme favicon'lari (`iconChanged` -> TabButton).
 
 ## Teslim notu formati
 

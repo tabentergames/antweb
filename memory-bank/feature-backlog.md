@@ -96,4 +96,4 @@ Her biri kapatilabilir modul olarak `features/` altina gider; cekirdege gomulmez
 | todo | Sekme favicon'lari | `QWebEnginePage.iconChanged` -> TabButton'daki renkli noktanin yerine site ikonu; fan kartlarinda da kullanilabilir. |
 | todo | Error page | Ag/sertifika hata sayfalari icin TabX tasarimi. |
 | todo | Context menu | Geri/ileri, linki yeni sekmede ac, kopyala, inspect. |
-| todo | Keyboard shortcuts | Yeni sekme/kapat/yenile/omnibox ve ayarlanabilir kisayollar. |
+| done | Keyboard shortcuts | `_setup_shortcuts` — Cmd+T/W/R, Cmd+[/], Cmd+L (adres), fiziksel Ctrl+Tab (sekme dongusu), Cmd+1..9 (9=son), Cmd+Y (gecmis), Cmd+Shift+J (indirilenler). ApplicationShortcut context. Ayarlanabilir kisayollar sonraki dilim. |

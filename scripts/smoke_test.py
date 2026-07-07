@@ -240,6 +240,27 @@ def run() -> int:
     assert fake_request.cancelled, "downloads/cancel komutu calismadi"
     assert "ornek.zip" in window._internal_page_html("downloads"), "downloads sayfasi kaydi gostermiyor"
 
+    # Klavye kisayollari — nesneler kurulu, sekme gecis slot'lari dogru calisiyor.
+    assert len(window._shortcuts) == 19, "kisayol sayisi beklenenden farkli"
+    assert all(not sc.key().isEmpty() for sc in window._shortcuts), "bos kisayol dizisi var"
+
+    kb_before = window.tabs.count()
+    window.add_new_tab()
+    window.add_new_tab()
+    window.tabs.setCurrentIndex(0)
+    window.cycle_tab(1)
+    assert window.tabs.currentIndex() == 1, "cycle_tab ileri gitmedi"
+    window.cycle_tab(-1)
+    assert window.tabs.currentIndex() == 0, "cycle_tab geri gitmedi"
+    window.activate_tab_number(9)
+    assert window.tabs.currentIndex() == window.tabs.count() - 1, "9 son sekmeye gitmedi"
+    window.activate_tab_number(1)
+    assert window.tabs.currentIndex() == 0, "1 ilk sekmeye gitmedi"
+    window.focus_address_bar()  # offscreen'de odak garantisi yok; patlamamasi yeterli
+    while window.tabs.count() > kb_before:
+        window.close_current_tab()
+    assert window.tabs.count() == kb_before, "kisayol testi sekmeleri kapanmadi"
+
     # F2.5 — tab strip ekle/kapat: once reduced-motion yolu (deterministik).
     before = window.tabs.count()
     window.add_new_tab()
