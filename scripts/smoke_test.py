@@ -402,6 +402,11 @@ def run() -> int:
     )
 
     # F2.5 — tab strip ekle/kapat: once reduced-motion yolu (deterministik).
+    window.open_internal_page("newtab")
+    assert window._newtab_entry_overlay is None, (
+        "reduced-motion'da yeni sekme giris overlay'i olusmamali"
+    )
+
     before = window.tabs.count()
     window.add_new_tab()
     assert window.tabs.count() == before + 1, "sekme eklenmedi"
@@ -447,6 +452,10 @@ def run() -> int:
     assert strip.count() == 2, "strip'e sekme eklenmedi"
     strip._request_close(1)
 
+    # Yeni sekme dashboard girisi — webview yerine gecici overlay fade-out.
+    window.open_internal_page("newtab")
+    assert window._newtab_entry_overlay is not None, "newtab giris overlay'i olusmadi"
+
     # Snapshot sekme gecisi — animasyonlu yol: ghost olusur, bitiste temizlenir.
     window.add_new_tab()
     window.handle_tab_activated(0)
@@ -457,6 +466,7 @@ def run() -> int:
     def _check_animated_close():
         results["count"] = strip.count()
         results["ghost"] = window._switch_ghost
+        results["newtab_overlay"] = window._newtab_entry_overlay
         Motion.configure(False)
         window.close_tab(window.tabs.count() - 1)
         app.quit()
@@ -465,6 +475,7 @@ def run() -> int:
     app.exec()
     assert results.get("count") == 1, "animasyonlu kapatma tamamlanmadi"
     assert results.get("ghost") is None, "gecis ghost'u animasyon sonunda temizlenmedi"
+    assert results.get("newtab_overlay") is None, "newtab overlay'i temizlenmedi"
     print("SMOKE TEST PASS")
     return 0
 

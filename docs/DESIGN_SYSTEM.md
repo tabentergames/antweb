@@ -28,7 +28,7 @@ Yeni bir görsel değer gerekiyorsa sıra şudur: önce token olarak `theme.py`/
 
 - **Süreler:** `FAST=120ms` (hover/vurgu), `BASE=200ms` (panel, sekme), `SLOW=320ms` (sayfa/workspace geçişi), `GRAND=480ms` (nadir sahne değişimi). Ara değer uydurma.
 - **Easing:** giren eleman `Motion.ENTER` (OutCubic), çıkan `Motion.EXIT` (InCubic), yer değiştiren `Motion.MOVE`. `EMPHASIS` (OutBack) yalnızca küçük vurgularda; layout genişliği/yüksekliği anime ederken kullanma (taşma yapar).
-- **Yardımcılar:** panel aç/kapa → `slide_panel()`, basit görünürlük → `fade_in()`, tek property → `animate()`. Elle `QPropertyAnimation` kurma; yardımcı yetmiyorsa yardımcıyı genişlet.
+- **Yardımcılar:** panel aç/kapa → `slide_panel()`, basit görünürlük → `fade_in()`/`fade_out()`, tek property → `animate()`. Elle `QPropertyAnimation` kurma; yardımcı yetmiyorsa yardımcıyı genişlet.
 - **Reduced motion:** `Motion.enabled = False` iken tüm yardımcılar animasyonsuz, anında sonuç verir. Yeni animasyon eklerken bu yoldan da çalıştığını doğrula. (Ayarlar sayfası toggle'ı backlog'da.)
 
 ## 4. QWebEngineView altın kuralı

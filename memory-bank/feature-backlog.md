@@ -19,7 +19,7 @@ Kurallar: `docs/DESIGN_SYSTEM.md`. Motion altyapisina dokunan isler SIRALI yurut
 
 | Durum | Is | Not |
 | --- | --- | --- |
-| done | Motion token katmani | `ui/motion.py` — sure/easing tokenlari, `animate`, `slide_panel`, `fade_in`, `snapshot_of`. |
+| done | Motion token katmani | `ui/motion.py` — sure/easing tokenlari, `animate`, `slide_panel`, `fade_in`, `fade_out`, `snapshot_of`. |
 | done | Tasarim tokenlari genisletildi | `ui/theme.py` — SPACE/RADIUS skalalari + glass/scrim seffaf yuzey renkleri (light+dark). |
 | done | Panel ac/kapa animasyonu | Sol/sag sidebar `slide_panel` ile kayarak acilir; genislikler sinif sabiti oldu. |
 | done | Offscreen smoke test | `scripts/smoke_test.py` — pencere kurulumu, panel toggle, tema degisimi. |
@@ -28,8 +28,8 @@ Kurallar: `docs/DESIGN_SYSTEM.md`. Motion altyapisina dokunan isler SIRALI yurut
 | done | Fan sekme modu | `ui/tabs/fan_overlay.py` — toolbar `❖`; scrim + glass panel, snapshot kartlari merkezden `Motion.SLOW` ile yayilir; karta tiklama aktive eder, ESC/dis tiklama kapatir. |
 | done | Glass yuzey gecisi | `TextInputDialog`/`ConfirmDialog` `Theme.glass_strong` + `glass_border`'a tasindi (gercek floating/modal yuzeyler). Sidebar/rail/tab-strip docked oldugu icin kapsam disi birakildi (DESIGN_SYSTEM §2); toolbar zaten kendi `Theme.toolbar` yari saydam tokenini kullaniyor. |
 | done | Reduced-motion ayari | `tabx://settings` "Hareket" karti -> `toggle_reduced_motion` -> `Motion.configure`; `data/ui_state.json.reduced_motion`'a yazilir, acilista uygulanir. |
-| todo | Cikis/giris sayfa gecisi | Yeni sekme dashboard'una acilirken yumusak giris animasyonu. |
-| todo | Frameless kabuk arastirmasi | FramelessWindowHint + macOS trafik isiklari/surukleme; ayri arastirma dilimi, dogrudan uygulama yazma. |
+| done | Cikis/giris sayfa gecisi | Yeni sekme dashboard'u acilirken webview'e efekt uygulamadan gecici overlay `fade_out` ile yumusak giris yapar; reduced-motion'da overlay olusmaz. |
+| done | Frameless kabuk arastirmasi | `docs/FRAMELESS_SHELL_RESEARCH.md` — su asamada uygulanmamasi, ileride ayri spike olarak denenmesi kararlastirildi. |
 
 ## F2.6 - Panel Yogunluk Gecisi (gorsel sadelestirme)
 

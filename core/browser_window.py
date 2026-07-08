@@ -31,7 +31,7 @@ from features.privacy.service import PrivacyService
 from features.downloads.manager import DownloadManager
 from features.library.store import BookmarkStore, HistoryStore
 from core.session import DEFAULT_WORKSPACE, SessionStore
-from ui.motion import Motion, animate, snapshot_of
+from ui.motion import Motion, animate, fade_out, snapshot_of
 from ui.tabs.fan_overlay import FanOverlay
 from ui.tabs.tab_strip import TabWidget
 from ui.theme import Theme
@@ -485,6 +485,7 @@ class BrowserWindow(QMainWindow):
         self.resize(1440, 900)
         self.current_view = None
         self._switch_ghost = None
+        self._newtab_entry_overlay = None
         self._fan_overlay = None
         self._tab_snapshots = {}
         self.left_sidebar_open = False
@@ -2088,12 +2089,39 @@ class BrowserWindow(QMainWindow):
         page_key = page_key if page_key in self.INTERNAL_PAGES else "newtab"
         view._internal_key = page_key
         view.setHtml(self._internal_page_html(page_key), QUrl(f"tabx://{page_key}"))
+        if page_key == "newtab":
+            self._animate_newtab_entry(view)
         self.update_address_bar(QUrl(f"tabx://{page_key}"))
         try:
             index = self.tabs._views.index(view)
         except ValueError:
             return
         self.tabs.setTabText(index, self._internal_page_title(page_key))
+
+    def _animate_newtab_entry(self, view):
+        """Yeni sekme dashboard'unu overlay fade ile ac; webview'e efekt uygulama."""
+        if not Motion.enabled or not self.isVisible():
+            return
+        parent = view.parentWidget()
+        if parent is None:
+            return
+        if self._newtab_entry_overlay is not None:
+            self._newtab_entry_overlay.deleteLater()
+            self._newtab_entry_overlay = None
+        overlay = QWidget(parent)
+        overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        overlay.setStyleSheet(f"background-color: {Theme.panel}; border: none;")
+        overlay.setGeometry(view.geometry())
+        overlay.show()
+        overlay.raise_()
+        self._newtab_entry_overlay = overlay
+
+        def _cleanup():
+            if self._newtab_entry_overlay is overlay:
+                self._newtab_entry_overlay = None
+            overlay.deleteLater()
+
+        fade_out(overlay, duration=Motion.SLOW, on_finished=_cleanup)
 
     def _internal_page_key(self, url):
         if url.scheme() != "tabx":

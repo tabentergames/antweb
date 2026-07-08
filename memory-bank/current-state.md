@@ -1,6 +1,6 @@
 # Current State
 
-Son guncelleme: 2026-07-07
+Son guncelleme: 2026-07-08
 
 ## Repodaki gercek durum
 
@@ -39,12 +39,14 @@ Son guncelleme: 2026-07-07
   - F3 bilesenleri `BrowserWindow._setup_privacy_layer()` ile default QWebEngineProfile'a baglanmis durumda.
   - UI state kaydi: `data/ui_state.json`.
   - macOS app build script: `scripts/build_macos_app.py`.
-  - **F2.5 motion katmani:** `ui/motion.py` — sure/easing tokenlari, `animate`, `slide_panel`, `fade_in`, `snapshot_of`; `Motion.configure(False)` ile reduced-motion yolu.
+  - **F2.5 motion katmani:** `ui/motion.py` — sure/easing tokenlari, `animate`, `slide_panel`, `fade_in`, `fade_out`, `snapshot_of`; `Motion.configure(False)` ile reduced-motion yolu.
   - **F2.5 tasarim tokenlari:** `ui/theme.py` — SPACE_XS..XL, RADIUS_SM..PILL sabitleri + light/dark `glass`, `glass_strong`, `glass_border`, `scrim` seffaf yuzey renkleri.
   - Sol/sag sidebar `slide_panel` ile animasyonlu acilip kapaniyor; genislikler `BrowserWindow.LEFT/RIGHT_SIDEBAR_WIDTH` sabitlerinde.
   - **F2.5 tab strip animasyonlari:** `ui/tabs/tab_strip.py` — sekme ekleme buyuyerek girer (`Motion.BASE`/ENTER), kapatma daralarak cikar (`Motion.BASE`/EXIT, `tabClosed` animasyon bitiminde yayilir), hover `hoverProgress` pyqtProperty + `Theme.mix` renk gecisiyle (`Motion.FAST`). Reduced-motion'da hepsi anlik.
   - **F2.5 snapshot sekme gecisi:** `core/browser_window.py::_switch_view_with_transition` — aktif sekme degisiminde eski view'in snapshot'i (`snapshot_of`) yeni view ustunde `Motion.SLOW`/EXIT ile yana kayar; yon sekme indeks farkina gore. Aktif sekme kapatilirken snapshot `removeWidget`'tan once alinir. Webview'e efekt uygulanmaz; reduced-motion'da gecis anlik.
   - **F2.5 fan sekme modu:** `ui/tabs/fan_overlay.py` (`FanOverlay`/`FanCard`) + toolbar `❖` butonu (`toggle_fan_mode`). Scrim (`Theme.scrim`) uzerinde glass panel (`Theme.glass_strong`); sekme snapshot kartlari panel merkezinden grid'e `Motion.SLOW` ile yayilir. Karta tiklama sekmeyi aktive eder; ESC/dis tiklama kapatir; host resize'inda grid yeniden yerlesir. Arka plan sekme goruntuleri `_tab_snapshots` cache'inden gelir (sekme gecisinde saklanan kare); aktif sekme canli grab edilir. Workspace/profil/tema gecisinde overlay otomatik kapanir.
+  - **F2.5 yeni sekme giris gecisi:** `BrowserWindow._animate_newtab_entry` — `tabx://newtab` yuklenirken webview'e opacity/transform uygulamadan QStackedWidget ustunde gecici `QWidget` overlay olusturur ve `fade_out` (`Motion.SLOW`) ile dashboard'u aciga cikarir. `Motion.enabled=False` veya pencere gorunur degilken overlay olusmaz.
+  - **F2.5 frameless kabuk arastirmasi:** `docs/FRAMELESS_SHELL_RESEARCH.md` — `FramelessWindowHint` su asamada uygulanmadi; macOS pencere davranisi, trafik isiklari, surukleme/resize ve QtWebEngine riskleri nedeniyle ileride ayri spike olarak ele alinacak.
   - **Gorsel tutarlilik anayasasi:** `docs/DESIGN_SYSTEM.md` — token kullanimi, hareket dili, webview snapshot deseni, UI teslim kontrol listesi.
   - **Smoke test:** `scripts/smoke_test.py` — offscreen pencere kurulumu, panel toggle, tema degisimi, F4 store/workspace kontrolleri, snapshot sekme gecisi (reduced-motion anlik yol + animasyonlu yolda ghost olusumu/temizligi) + fan modu (ac/sec/kapat, toggle).
   - **F4 — Oturum restore:** `core/session.py` — profil+workspace bazli sekme seti kaydi (`data/sessions.json`); kapanis, tema degisimi ve workspace/profil gecislerinde kaydedilir, acilista geri yuklenir.
@@ -61,13 +63,12 @@ Son guncelleme: 2026-07-07
 
 - `core/browser_window.py` hala sidebar, dialogs ve internal page HTML'lerini iceriyor; F2'nin kritik tema/tab parcalari ayrildi.
 - `assets/`, `tests/` hedef klasorleri henuz kurulmus degil.
-- Fan sekme modu yok; F2 tamamlanma kriteri esnek sekme konumu ile karsilandi.
 - F3 gizlilik ozelliklerinin ac/kapat toggle'lari ve izin paneli var; site verisi temizleme hala yok. Izin karari per-origin hatirlanmiyor — her istek global `permission_mode`'a gore degerlendirilir.
 - "Temel tarayici yuzeyleri" fazi tamamlandi. Kalan kucuk borclar: downloads kayitlari oturum ici (kalici degil) ve ilerleme canli guncellenmiyor; kisayollar sabit (ayarlanamaz); error page sertifika hatalarinda ayrintili bilgi vermez (genel sablon).
 - Favicon'lar oturumlar arasi cache'lenmiyor (her sayfa yuklendiginde yeniden gelir). Omnibox onerileri/gecmis tamamlama yok (arama motoru secimi var).
 - History'de arama/filtre, bookmark'ta etiket/klasor yok; ilk dilim bilincli olarak sade.
 - Test paketi olarak yalnizca `scripts/smoke_test.py` var; `tests/` altinda state-store ve motion testleri eklenmeli.
-- Tab strip artik Motion tokenlarini kullaniyor; toolbar ve dialoglar ile tab strip'in SPACE/RADIUS geometri degerleri hala ciplak (kademeli goc surecek); glass yuzey gecisi siradaki F2.5 dilimi.
+- F2.5 kapandi. Tab strip artik Motion tokenlarini kullaniyor; toolbar ve dialoglar ile tab strip'in SPACE/RADIUS geometri degerleri hala ciplak (kademeli goc surecek), ancak yeni F2.5 isi acmadan once F5/F6/F7 faz secimi yapilmali.
 
 ## Cikis kriteri
 

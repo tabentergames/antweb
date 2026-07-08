@@ -1,9 +1,17 @@
 # Agent Handoff
 
-Son guncelleme: 2026-07-07
+Son guncelleme: 2026-07-08
 
 ## Son kararlar
 
+- **F2.5 kapandi (2026-07-08):** Son iki acik dilim tamamlandi.
+  Yeni sekme/dashboard girisi `BrowserWindow._animate_newtab_entry` ile
+  webview'e efekt uygulamadan gecici overlay `fade_out` (`Motion.SLOW`) olarak
+  eklendi; reduced-motion'da overlay olusmaz. `ui.motion.fade_out` genel
+  QWidget yardimcisidir, QWebEngineView'de kullanilmaz. Frameless kabuk maddesi
+  kodlanmadi; `docs/FRAMELESS_SHELL_RESEARCH.md` karar dokumani yazildi ve
+  `FramelessWindowHint`'in simdilik uygulanmamasi, ileride ayri spike olarak
+  denenmesi kararlastirildi.
 - **Arama motoru secimi tamamlandi (2026-07-07, kullanici istegi):**
   `UiStateStore.search_engines` sinif tablosu (anahtar -> (ad, URL sablonu));
   yeni motor eklemek = tabloya satir eklemek, UI pill'leri otomatik uretilir.
@@ -239,13 +247,8 @@ Son guncelleme: 2026-07-07
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-Klavye kisayollari ve Downloads tamamlandi. "Temel tarayici yuzeyleri"nde
-kalan dilimler: context menu, sekme favicon'lari, error page. F3'te yalnizca
-site veri temizleme kaldi. Onerilen siradaki is:
-
-"Temel tarayici yuzeyleri" ve F3 fazlari KAPANDI. Acik fazlar yalnizca
-F5 Productivity, F6 Developer Tools ve F7 Power UX (ucu de bos) + F2.5'in
-iki dusuk oncelikli arastirma dilimi.
+"Temel tarayici yuzeyleri", F2.5 ve F3 fazlari KAPANDI. Acik fazlar artik
+F5 Productivity, F6 Developer Tools ve F7 Power UX.
 
 Yeni faz secimi KULLANICIYA SORULMALI. Kullanici gorsel cilaya deger
 veriyor; F7'nin komut paleti (Cmd+K, `Theme.glass_strong` overlay, sekme/
@@ -256,29 +259,19 @@ FanOverlay'in scrim+glass+ESC/dis-tiklama deseni, `_setup_shortcuts`
 secilirse DevTools penceresi (QWebEnginePage.setDevToolsPage) en somut
 baslangic.
 
-Neden:
-
-- `QWebEngineView.contextMenuEvent` override (veya `createStandardContextMenu`
-  ozellestirme) ile yapilir; `_menu_style()` token-bazli QMenu stili hazir.
-- "Linki yeni sekmede ac" icin `page().contextMenuData()` yerine Qt6'da
-  `lastContextMenuRequest()` kullanilir (QWebEngineContextMenuRequest) —
-  API adina dikkat.
-
 Net teslim kriteri:
 
-- Sag tik menusu TabX temasiyla gorunur (native menu degil); geri/ileri/yenile
-  + linki yeni sekmede ac + adres kopyala calisiyor.
-- Ic sayfalarda (tabx://) da patlamiyor.
+- F7 komut paleti secilirse `FanOverlay` scrim/glass/ESC desenini kullan;
+  komutlar sekme/ayar/ic sayfa acma gibi mevcut calisan yuzeylerle sinirli kalsin.
+- F5 secilirse ilk dilim floating todo widget olsun; veri icin SQLite store
+  desenini `features/library/store.py` dosyasindan al.
+- F6 secilirse DevTools penceresi en somut baslangic; `QWebEnginePage.setDevToolsPage`
+  yolunu izole bir feature olarak kur.
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
-
-Paralel yurutulebilir ikinci gorev (farkli dosyalar): F3 | Modul:
-`core/browser_window.py` (`_settings_page_html`) | Kapsam: site verisi
-temizleme — `QWebEngineProfile.clearHttpCache()` +
-`profile.cookieStore().deleteAllCookies()` cagiran bir "Gizlilik" karti komutu.
 
 Birikmis kucuk iyilestirmeler (istenirse ayri dilimler): kalici indirme
 gecmisi (SQLite), downloads canli ilerleme, toolbar indirme gostergesi,
-ayarlanabilir kisayollar, sekme favicon'lari (`iconChanged` -> TabButton).
+ayarlanabilir kisayollar, favicon cache, omnibox onerileri/gecmis tamamlama.
 
 ## Teslim notu formati
 

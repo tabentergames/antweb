@@ -127,6 +127,26 @@ def fade_in(widget, duration: int = Motion.FAST) -> None:
     animate(effect, b"opacity", 0.0, 1.0, duration=duration, on_finished=_cleanup)
 
 
+def fade_out(widget, duration: int = Motion.FAST, on_finished=None) -> None:
+    """Duz QWidget'lar icin opacity fade-out. QWebEngineView'de KULLANMA."""
+    if not Motion.enabled:
+        widget.setVisible(False)
+        if on_finished:
+            on_finished()
+        return
+    effect = QGraphicsOpacityEffect(widget)
+    widget.setGraphicsEffect(effect)
+
+    def _cleanup():
+        widget.setGraphicsEffect(None)
+        widget.setVisible(False)
+        if on_finished:
+            on_finished()
+
+    widget.setVisible(True)
+    animate(effect, b"opacity", 1.0, 0.0, duration=duration, on_finished=_cleanup)
+
+
 def snapshot_of(view) -> QLabel:
     """Bir widget'in (webview dahil) o anki goruntusunu QLabel olarak dondurur.
 
