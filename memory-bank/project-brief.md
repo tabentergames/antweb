@@ -17,6 +17,10 @@ TabX, gelistiriciler ve power-user'lar icin PyQt6 + QtWebEngine uzerinde gelisti
 - Chrome Web Store native uzanti destegi yoktur.
 - Eklenti ihtiyaci TabX'e ozel JS/CSS injection sistemiyle cozulur.
 - Ozellikler mumkun oldugunca `features/` altinda modul olarak tasarlanir; `core/` sade kalir.
+- Tarayici moduler ve yer degistirilebilir bir yapi olarak evrilmelidir:
+  paneller, widget'lar, araclar ve ana yuzeyler mumkun oldugunca bagimsiz
+  modul olur; ileride kullanici bunlarin konumunu/erisimi seklini
+  degistirebilecek sekilde tasarlanir.
 
 ## MVP hedefi
 
@@ -27,4 +31,3 @@ Firma ici ilk gosterim icin:
 - Temel ad/tracker blocking
 - Basit ayarlar ve tema kontrolu
 - Stabil baslatma: `python3 main.py`
-

@@ -1,9 +1,47 @@
 # Agent Handoff
 
-Son guncelleme: 2026-07-08
+Son guncelleme: 2026-07-09
 
 ## Son kararlar
 
+- **F7 scroll auto-hide browser chrome tamamlandi (2026-07-09):**
+  Her yeni sekmede `page().scrollPositionChanged` -> `_handle_scroll_position`
+  baglanir. Asagi scroll'da `hide_browser_chrome()` tab strip + toolbar'i
+  `maximumHeight` animasyonuyla 0'a indirir; yukari scroll veya ust kenardaki
+  `ChromeRevealHotspot` hover'i `show_browser_chrome()` ile geri acar.
+  Webview'e efekt uygulanmaz. Reduced-motion'da `setFixedHeight` ile anliktir.
+  Adres cubugu odaktayken gizleme yapilmaz.
+- **F5 not sistemi tamamlandi (2026-07-09):**
+  `features/productivity/notes_store.py` profil bazli SQLite store ekler ve
+  mevcut `data/productivity-<profil>.db` icinde `notes` tablosunu kullanir.
+  `tabx://notes` ic sayfasi notlari listeler; `NoteInputDialog` ile
+  baslik+Markdown metni eklenir, silme komut linkiyle calisir. Markdown
+  ilk dilimde parser'siz/pre-wrap duz metin olarak gosterilir. Sol panel
+  ve `⋯` menuden erisim var. Not ekleme de navigasyon callback'i icinde
+  modal acmamak icin `QTimer.singleShot(0, ...)` ile ertelenir.
+- **Urun notu islendi (2026-07-09):** TabX moduler ve yer degistirilebilir
+  bir yapi olarak evrilmeli. Panel, widget, arac ve uretkenlik yuzeyleri
+  ileride kullanici tarafindan farkli konuma/erisime alinabilecek kadar
+  bagimsiz tasarlanmali. Not `memory-bank/project-brief.md` ve
+  `docs/AGENT_WORKFLOW.md` icine eklendi.
+- **F5 Kanban board tamamlandi (2026-07-09):**
+  `features/productivity/kanban_store.py` profil bazli SQLite store ekler
+  ve mevcut `data/productivity-<profil>.db` icinde `kanban_cards` tablosunu
+  kullanir. `tabx://tasks` ic sayfasi backlog/doing/done kolonlarini gosterir;
+  kart ekleme `TextInputDialog` ile `QTimer.singleShot(0, ...)` uzerinden
+  ertelenir, tasima/silme komut linkleriyle calisir. Sol panel ve `⋯`
+  menuden erisim var. Basit ilk dilimde drag-drop yok; yer degistirme
+  linkleriyle yapiliyor.
+- **F5 floating todo widget tamamlandi (2026-07-09):**
+  `features/productivity/todo_store.py` profil bazli SQLite store ekler
+  (`data/productivity-<profil>.db`). Toolbar `✓` butonu `TodoFloatingPanel`
+  glass overlay'ini acar/kapatir; ekle/tamamla/sil akisi calisir. Panel
+  central widget'a parent'li overlay'dir ve `pos` animasyonuyla sag alttan
+  gelir; reduced-motion'da aninda acilip kapanir. Profil degisiminde
+  `self.todos.close()` -> `_setup_web_profile()` ile yeni profil store'u
+  kurulur. Kritik not: `_rebuild_visual_shell` yeni central widget'i pencere
+  gorunurken `show()` eder; aksi halde offscreen smoke ortaminda yeni central
+  gizli kalip overlay child'lari `isVisible()` false donuyordu.
 - **F2.5 kapandi (2026-07-08):** Son iki acik dilim tamamlandi.
   Yeni sekme/dashboard girisi `BrowserWindow._animate_newtab_entry` ile
   webview'e efekt uygulamadan gecici overlay `fade_out` (`Motion.SLOW`) olarak
@@ -247,24 +285,23 @@ Son guncelleme: 2026-07-08
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-"Temel tarayici yuzeyleri", F2.5 ve F3 fazlari KAPANDI. Acik fazlar artik
-F5 Productivity, F6 Developer Tools ve F7 Power UX.
+"Temel tarayici yuzeyleri", F2.5 ve F3 fazlari KAPANDI. F5 Productivity
+basladi; floating todo widget, Kanban board ve not sistemi tamamlandi. Acik
+fazlar artik F5 web-clipper devam isi, F6 Developer Tools ve F7 Power UX.
 
-Yeni faz secimi KULLANICIYA SORULMALI. Kullanici gorsel cilaya deger
-veriyor; F7'nin komut paleti (Cmd+K, `Theme.glass_strong` overlay, sekme/
-ayar/komut aramasi) iyi bir ilk aday. Komut paleti icin hazir yapi taslari:
+F5'ten devam edilecekse siradaki en dogal dilim web clipper'dir; secili
+metni veya sayfa basligini local nota kaydetme ile kucuk tutulmali.
+Kullanici F7 isterse komut paleti iyi ilk adaydir:
 FanOverlay'in scrim+glass+ESC/dis-tiklama deseni, `_setup_shortcuts`
-(Ctrl+K eklenir), `Theme` tokenlari. F5 secilirse floating todo widget
-(SQLite, `features/library/store.py` deseni) ilk dilim onerisi; F6
-secilirse DevTools penceresi (QWebEnginePage.setDevToolsPage) en somut
-baslangic.
+(Ctrl+K eklenir), `Theme` tokenlari. F6 secilirse DevTools penceresi
+(QWebEnginePage.setDevToolsPage) en somut baslangic.
 
 Net teslim kriteri:
 
 - F7 komut paleti secilirse `FanOverlay` scrim/glass/ESC desenini kullan;
   komutlar sekme/ayar/ic sayfa acma gibi mevcut calisan yuzeylerle sinirli kalsin.
-- F5 secilirse ilk dilim floating todo widget olsun; veri icin SQLite store
-  desenini `features/library/store.py` dosyasindan al.
+- F5 devam ederse web clipper icin mevcut `NotesStore`u kullan; secim metni
+  yakalama/cagirma cekirdege minimum baglansin.
 - F6 secilirse DevTools penceresi en somut baslangic; `QWebEnginePage.setDevToolsPage`
   yolunu izole bir feature olarak kur.
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.

@@ -30,6 +30,9 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from features.privacy.service import PrivacyService
 from features.downloads.manager import DownloadManager
 from features.library.store import BookmarkStore, HistoryStore
+from features.productivity.kanban_store import KanbanStore
+from features.productivity.notes_store import NotesStore
+from features.productivity.todo_store import TodoStore
 from core.session import DEFAULT_WORKSPACE, SessionStore
 from ui.motion import Motion, animate, fade_out, snapshot_of
 from ui.tabs.fan_overlay import FanOverlay
@@ -40,11 +43,14 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
     QHBoxLayout,
+    QCheckBox,
     QLabel,
     QLineEdit,
     QMainWindow,
     QMenu,
+    QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -357,6 +363,97 @@ class ConfirmDialog(QDialog):
         return dialog.exec() == QDialog.DialogCode.Accepted
 
 
+class NoteInputDialog(QDialog):
+    """Local not olusturma dialogu."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Yeni not")
+        self.setModal(True)
+        self.setFixedWidth(520)
+        self.setStyleSheet(self._dialog_style())
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(22, 20, 22, 18)
+        layout.setSpacing(12)
+
+        title_label = QLabel("Yeni not")
+        title_label.setStyleSheet(
+            f"font-size: 17px; font-weight: 800; color: {Theme.text};"
+        )
+        layout.addWidget(title_label)
+
+        self.title_input = QLineEdit()
+        self.title_input.setPlaceholderText("Başlık")
+        self.title_input.setFixedHeight(40)
+        self.title_input.setStyleSheet(self._input_style())
+        layout.addWidget(self.title_input)
+
+        self.body_input = QPlainTextEdit()
+        self.body_input.setPlaceholderText("Markdown not içeriği")
+        self.body_input.setFixedHeight(180)
+        self.body_input.setStyleSheet(self._text_style())
+        layout.addWidget(self.body_input)
+
+        actions = QHBoxLayout()
+        actions.addStretch(1)
+        cancel = TextInputDialog._dialog_button(self, "Vazgeç", primary=False)
+        cancel.clicked.connect(self.reject)
+        ok = TextInputDialog._dialog_button(self, "Kaydet", primary=True)
+        ok.clicked.connect(self.accept)
+        actions.addWidget(cancel)
+        actions.addWidget(ok)
+        layout.addLayout(actions)
+
+    @classmethod
+    def get_note(cls, parent):
+        dialog = cls(parent)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return "", "", False
+        return (
+            dialog.title_input.text().strip(),
+            dialog.body_input.toPlainText().strip(),
+            True,
+        )
+
+    def _input_style(self):
+        return f"""
+            QLineEdit {{
+                border: 1px solid {Theme.border};
+                border-radius: {Theme.RADIUS_MD}px;
+                background-color: {Theme.input};
+                padding: 0 {Theme.SPACE_MD}px;
+                font-size: 13px;
+                color: {Theme.text};
+                selection-background-color: {Theme.purple};
+            }}
+            QLineEdit:focus {{ border-color: {Theme.purple}; }}
+        """
+
+    def _text_style(self):
+        return f"""
+            QPlainTextEdit {{
+                border: 1px solid {Theme.border};
+                border-radius: {Theme.RADIUS_MD}px;
+                background-color: {Theme.input};
+                padding: {Theme.SPACE_MD}px;
+                font-size: 13px;
+                color: {Theme.text};
+                selection-background-color: {Theme.purple};
+            }}
+            QPlainTextEdit:focus {{ border-color: {Theme.purple}; }}
+        """
+
+    def _dialog_style(self):
+        return f"""
+            QDialog {{
+                background-color: {Theme.glass_strong};
+                border: 1px solid {Theme.glass_border};
+                border-radius: {Theme.RADIUS_LG}px;
+            }}
+        """
+
+
 class HoverRevealRow(QFrame):
     """Fare uzerindeyken eylem butonlarini gosteren satir (F2.6 panel deseni).
 
@@ -384,6 +481,183 @@ class HoverRevealRow(QFrame):
         for widget in self._reveal_widgets:
             widget.setVisible(False)
         super().leaveEvent(event)
+
+
+class ChromeRevealHotspot(QFrame):
+    """Browser chrome gizliyken ust kenardan geri cagiran ince alan."""
+
+    def __init__(self, shell, parent=None):
+        super().__init__(parent)
+        self.shell = shell
+        self.setFixedHeight(10)
+        self.setMouseTracking(True)
+        self.setStyleSheet("background: transparent; border: none;")
+
+    def enterEvent(self, event):  # noqa: N802
+        self.shell.show_browser_chrome()
+        super().enterEvent(event)
+
+
+class TodoFloatingPanel(QFrame):
+    """F5 floating todo widget; gorev verisi `TodoStore` icinde kalir."""
+
+    def __init__(self, parent, store, shell):
+        super().__init__(parent)
+        self.store = store
+        self.shell = shell
+        self.setObjectName("todoFloatingPanel")
+        self.setFixedSize(326, 430)
+        self.setStyleSheet(self._panel_style())
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(
+            Theme.SPACE_LG, Theme.SPACE_LG, Theme.SPACE_LG, Theme.SPACE_LG
+        )
+        layout.setSpacing(Theme.SPACE_MD)
+
+        header = QHBoxLayout()
+        header.setSpacing(Theme.SPACE_SM)
+        title = QLabel("Görevler")
+        title.setStyleSheet(
+            f"font-size: 16px; font-weight: 850; color: {Theme.text}; background: transparent;"
+        )
+        header.addWidget(title)
+        header.addStretch(1)
+        close = shell._icon_button("×", "Görevleri kapat")
+        close.setFixedSize(26, 26)
+        close.clicked.connect(lambda checked=False: shell.toggle_todo_widget(False))
+        header.addWidget(close)
+        layout.addLayout(header)
+
+        add_row = QHBoxLayout()
+        add_row.setSpacing(Theme.SPACE_SM)
+        self.input = QLineEdit()
+        self.input.setPlaceholderText("Yeni görev")
+        self.input.setFixedHeight(36)
+        self.input.setStyleSheet(
+            f"""
+            QLineEdit {{
+                border: 1px solid {Theme.border};
+                border-radius: {Theme.RADIUS_MD}px;
+                background-color: {Theme.input};
+                padding: 0 {Theme.SPACE_MD}px;
+                font-size: 13px;
+                color: {Theme.text};
+                selection-background-color: {Theme.purple};
+            }}
+            QLineEdit:focus {{ border-color: {Theme.purple}; }}
+            """
+        )
+        self.input.returnPressed.connect(self.add_from_input)
+        add_row.addWidget(self.input, 1)
+        add = shell._icon_button("+", "Görev ekle")
+        add.setFixedSize(34, 34)
+        add.clicked.connect(self.add_from_input)
+        add_row.addWidget(add)
+        layout.addLayout(add_row)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        self.list_host = QWidget()
+        self.list_host.setStyleSheet("background: transparent;")
+        self.list_layout = QVBoxLayout(self.list_host)
+        self.list_layout.setContentsMargins(0, 0, 0, 0)
+        self.list_layout.setSpacing(Theme.SPACE_XS)
+        self.scroll.setWidget(self.list_host)
+        layout.addWidget(self.scroll, 1)
+        self.render_items()
+
+    def _panel_style(self):
+        return f"""
+            QFrame#todoFloatingPanel {{
+                background-color: {Theme.glass_strong};
+                border: 1px solid {Theme.glass_border};
+                border-radius: {Theme.RADIUS_LG}px;
+            }}
+        """
+
+    def add_from_input(self):
+        text = self.input.text().strip()
+        if not text:
+            return
+        self.store.add(text)
+        self.input.clear()
+        self.render_items()
+
+    def render_items(self):
+        self.shell._clear_layout(self.list_layout)
+        items = self.store.all()
+        if not items:
+            empty = QLabel("Henüz görev yok.")
+            empty.setWordWrap(True)
+            empty.setStyleSheet(
+                f"font-size: 12px; color: {Theme.subtle}; padding: {Theme.SPACE_MD}px 0;"
+            )
+            self.list_layout.addWidget(empty)
+            self.list_layout.addStretch(1)
+            return
+        for todo_id, title, completed, _created_at in items:
+            self.list_layout.addWidget(self._row(todo_id, title, completed))
+        self.list_layout.addStretch(1)
+
+    def _row(self, todo_id, title, completed):
+        row = HoverRevealRow()
+        row.setMinimumHeight(38)
+        row.setStyleSheet(
+            f"""
+            QFrame {{ background-color: transparent; border-radius: {Theme.RADIUS_SM}px; }}
+            QFrame:hover {{ background-color: {Theme.panel_alt}; }}
+            """
+        )
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(
+            Theme.SPACE_SM, Theme.SPACE_XS, Theme.SPACE_XS, Theme.SPACE_XS
+        )
+        layout.setSpacing(Theme.SPACE_SM)
+        checkbox = QCheckBox()
+        checkbox.setChecked(completed)
+        checkbox.setToolTip("Tamamlandı")
+        checkbox.setStyleSheet(
+            f"""
+            QCheckBox::indicator {{
+                width: 16px;
+                height: 16px;
+                border-radius: {Theme.RADIUS_SM}px;
+                border: 1px solid {Theme.border};
+                background: {Theme.input};
+            }}
+            QCheckBox::indicator:checked {{
+                background: {Theme.purple};
+                border-color: {Theme.purple};
+            }}
+            """
+        )
+        checkbox.toggled.connect(
+            lambda checked, item_id=todo_id: self._set_completed(item_id, checked)
+        )
+        label = QLabel(title)
+        label.setWordWrap(True)
+        color = Theme.subtle if completed else Theme.text
+        label.setStyleSheet(
+            f"font-size: 12px; font-weight: 650; color: {color}; background: transparent;"
+        )
+        remove = self.shell._mini_button("×", "Görevi sil")
+        remove.clicked.connect(lambda checked=False, item_id=todo_id: self._remove(item_id))
+        layout.addWidget(checkbox)
+        layout.addWidget(label, 1)
+        layout.addWidget(remove)
+        row.register(remove)
+        return row
+
+    def _set_completed(self, todo_id, completed):
+        self.store.set_completed(todo_id, completed)
+        self.render_items()
+
+    def _remove(self, todo_id):
+        self.store.remove(todo_id)
+        self.render_items()
 
 
 class TabXPage(QWebEnginePage):
@@ -477,6 +751,11 @@ class BrowserWindow(QMainWindow):
 
     LEFT_SIDEBAR_WIDTH = 238
     RIGHT_SIDEBAR_WIDTH = 258
+    TAB_STRIP_HEIGHT = 50
+    TOOLBAR_HEIGHT = 68
+    CHROME_SCROLL_HIDE_DELTA = 18
+    CHROME_SCROLL_SHOW_DELTA = -12
+    CHROME_SCROLL_MIN_Y = 80
 
     def __init__(self):
         super().__init__()
@@ -490,6 +769,8 @@ class BrowserWindow(QMainWindow):
         self._tab_snapshots = {}
         self.left_sidebar_open = False
         self.right_sidebar_open = False
+        self.todo_widget_open = False
+        self.browser_chrome_hidden = False
         self._retired_profiles = []
         self._collapsed_groups = set()
         self._site_data_cleared = False
@@ -524,6 +805,9 @@ class BrowserWindow(QMainWindow):
         self.downloads.attach_profile(profile)
         self.history = HistoryStore(self.profile_name)
         self.bookmarks = BookmarkStore(self.profile_name)
+        self.todos = TodoStore(self.profile_name)
+        self.kanban = KanbanStore(self.profile_name)
+        self.notes = NotesStore(self.profile_name)
         self.workspace = SessionStore.active_workspace(self.profile_name)
 
     def _restore_session(self):
@@ -561,6 +845,9 @@ class BrowserWindow(QMainWindow):
         from PyQt6 import sip
 
         self.current_view = None
+        self.todos.close()
+        self.kanban.close()
+        self.notes.close()
         for view in list(self.tabs._views):
             if view:
                 self.web_container.removeWidget(view)
@@ -588,6 +875,11 @@ class BrowserWindow(QMainWindow):
         self.right_sidebar = self._create_right_sidebar()
         self.right_sidebar.setParent(central)
         self.right_sidebar.setVisible(False)
+        self.todo_widget_open = False
+        self.todo_panel = TodoFloatingPanel(central, self.todos, self)
+        self.todo_panel.setVisible(False)
+        self.chrome_reveal_hotspot = ChromeRevealHotspot(self, central)
+        self.chrome_reveal_hotspot.setVisible(False)
         return central
 
     def _position_sidebars(self):
@@ -604,6 +896,10 @@ class BrowserWindow(QMainWindow):
         self.right_sidebar.setGeometry(rx, 0, rw, height)
         self.left_sidebar.raise_()
         self.right_sidebar.raise_()
+        if hasattr(self, "todo_panel"):
+            self._position_todo_panel()
+        if hasattr(self, "chrome_reveal_hotspot"):
+            self._position_chrome_reveal_hotspot()
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
@@ -735,7 +1031,7 @@ class BrowserWindow(QMainWindow):
     def _create_toolbar(self):
         container = QFrame()
         container.setObjectName("toolbar")
-        container.setFixedHeight(68)
+        container.setFixedHeight(self.TOOLBAR_HEIGHT)
         container.setStyleSheet(
             f"""
             QFrame#toolbar {{
@@ -800,6 +1096,7 @@ class BrowserWindow(QMainWindow):
         # "⋯" menusune iner — toolbar kalabaligini azaltir.
         page_actions = [
             ("❖", "Sekme yelpazesi", self.toggle_fan_mode),
+            ("✓", "Görevler", self.toggle_todo_widget),
             ("◷", "Geçmiş", lambda: self.open_internal_page("history")),
             ("◐", "Açık/koyu tema", self.toggle_theme_mode),
         ]
@@ -813,6 +1110,8 @@ class BrowserWindow(QMainWindow):
         more_menu.setStyleSheet(self._menu_style())
         more_menu.addAction("⇅  Sekmeleri üste/alta al", self.toggle_tab_position)
         more_menu.addAction("⬇  İndirilenler", lambda: self.open_internal_page("downloads"))
+        more_menu.addAction("▦  Görev Tahtası", lambda: self.open_internal_page("tasks"))
+        more_menu.addAction("✎  Notlar", lambda: self.open_internal_page("notes"))
         more_menu.addAction("⚙  Ayarlar", lambda: self.open_internal_page("settings"))
         more_menu.addAction("?  Hakkında", lambda: self.open_internal_page("about"))
         more_btn.setMenu(more_menu)
@@ -856,6 +1155,14 @@ class BrowserWindow(QMainWindow):
         layout.addWidget(self.right_toggle_btn)
 
         return container
+
+    def _position_chrome_reveal_hotspot(self):
+        central = self.centralWidget()
+        if not central or not hasattr(self, "chrome_reveal_hotspot"):
+            return
+        self.chrome_reveal_hotspot.setGeometry(0, 0, central.width(), 10)
+        self.chrome_reveal_hotspot.setVisible(self.browser_chrome_hidden)
+        self.chrome_reveal_hotspot.raise_()
 
     def _toolbar_separator(self):
         line = QFrame()
@@ -964,6 +1271,8 @@ class BrowserWindow(QMainWindow):
             [
                 ("⌂", "Ana sayfa", False, lambda: self.open_internal_page("newtab")),
                 ("⬇", "İndirilenler", False, lambda: self.open_internal_page("downloads")),
+                ("▦", "Görev Tahtası", False, lambda: self.open_internal_page("tasks")),
+                ("✎", "Notlar", False, lambda: self.open_internal_page("notes")),
                 ("☆", "Favoriler", False, lambda: self.open_internal_page("bookmarks")),
                 ("◷", "Geçmiş", False, lambda: self.open_internal_page("history")),
                 ("⚙", "Ayarlar", False, lambda: self.open_internal_page("settings")),
@@ -1076,6 +1385,110 @@ class BrowserWindow(QMainWindow):
         self.right_sidebar_open = bool(open_state)
         self._slide_overlay_sidebar(self.right_sidebar, "right", self.right_sidebar_open)
         self._set_rail_button_active(self.right_toggle_btn, self.right_sidebar_open)
+
+    def hide_browser_chrome(self):
+        """Sekme cubugu + toolbar'i kaydirma sirasinda kompakt moda al."""
+        if self.browser_chrome_hidden:
+            return
+        if self.address_bar.hasFocus():
+            return
+        self.browser_chrome_hidden = True
+        self._animate_browser_chrome(False)
+
+    def show_browser_chrome(self):
+        """Ust kenar hover'i veya yukari scroll ile chrome'u geri getir."""
+        if not self.browser_chrome_hidden:
+            return
+        self.browser_chrome_hidden = False
+        self._animate_browser_chrome(True)
+
+    def _animate_browser_chrome(self, visible):
+        widgets = (
+            (self.tabs, self.TAB_STRIP_HEIGHT),
+            (self.toolbar, self.TOOLBAR_HEIGHT),
+        )
+        for widget, height in widgets:
+            widget.setMinimumHeight(0)
+            if not Motion.enabled:
+                widget.setFixedHeight(height if visible else 0)
+                continue
+            if visible:
+                widget.setMaximumHeight(0)
+                widget.setVisible(True)
+                animate(
+                    widget, b"maximumHeight", 0, height,
+                    duration=Motion.BASE, easing=Motion.ENTER,
+                    on_finished=lambda w=widget, h=height: w.setFixedHeight(h),
+                )
+            else:
+                widget.setMaximumHeight(height)
+                animate(
+                    widget, b"maximumHeight", height, 0,
+                    duration=Motion.BASE, easing=Motion.EXIT,
+                    on_finished=lambda w=widget: w.setFixedHeight(0),
+                )
+        self._position_chrome_reveal_hotspot()
+
+    def _handle_scroll_position(self, view, position):
+        if view is not self.current_view:
+            return
+        y = float(position.y())
+        last_y = getattr(view, "_last_scroll_y", y)
+        view._last_scroll_y = y
+        delta = y - last_y
+        if delta > self.CHROME_SCROLL_HIDE_DELTA and y > self.CHROME_SCROLL_MIN_Y:
+            self.hide_browser_chrome()
+        elif delta < self.CHROME_SCROLL_SHOW_DELTA or y <= 4:
+            self.show_browser_chrome()
+
+    def toggle_todo_widget(self, open_state=None):
+        if open_state is None:
+            open_state = not self.todo_widget_open
+        self.todo_widget_open = bool(open_state)
+        self._slide_todo_panel(self.todo_widget_open)
+
+    def _position_todo_panel(self):
+        central = self.centralWidget()
+        if not central or not hasattr(self, "todo_panel"):
+            return
+        margin = Theme.SPACE_LG
+        open_x = central.width() - self.todo_panel.width() - margin
+        open_y = max(margin, central.height() - self.todo_panel.height() - margin)
+        closed_x = central.width() + margin
+        self.todo_panel.move(open_x if self.todo_widget_open else closed_x, open_y)
+        self.todo_panel.raise_()
+
+    def _slide_todo_panel(self, open_state):
+        central = self.centralWidget()
+        if not central or not hasattr(self, "todo_panel"):
+            return
+        self.todo_panel.render_items()
+        margin = Theme.SPACE_LG
+        open_pos = QPoint(
+            central.width() - self.todo_panel.width() - margin,
+            max(margin, central.height() - self.todo_panel.height() - margin),
+        )
+        closed_pos = QPoint(central.width() + margin, open_pos.y())
+        self.todo_panel.raise_()
+        if not Motion.enabled:
+            self.todo_panel.move(open_pos if open_state else closed_pos)
+            self.todo_panel.setVisible(open_state)
+            return
+        if open_state:
+            self.todo_panel.move(closed_pos)
+            self.todo_panel.setVisible(True)
+            animate(
+                self.todo_panel, b"pos", closed_pos, open_pos,
+                duration=Motion.BASE, easing=Motion.ENTER,
+            )
+        else:
+            def _hide():
+                self.todo_panel.setVisible(False)
+
+            animate(
+                self.todo_panel, b"pos", self.todo_panel.pos(), closed_pos,
+                duration=Motion.BASE, easing=Motion.EXIT, on_finished=_hide,
+            )
 
     def _slide_overlay_sidebar(self, panel, side, open_state):
         """Overlay paneli kenardan kaydirir; icerigi itmez, uzerine biner."""
@@ -1202,6 +1615,18 @@ class BrowserWindow(QMainWindow):
         self.web_profile.cookieStore().deleteAllCookies()
         self._site_data_cleared = True
 
+    def add_kanban_card(self, column_key="backlog"):
+        column_key = column_key if column_key in KanbanStore.columns else "backlog"
+        label = KanbanStore.column_labels[column_key]
+        title, ok = TextInputDialog.get_text(self, f"{label} kartı", "Kart başlığı")
+        if ok and title:
+            self.kanban.add(title, column_key)
+
+    def add_note(self):
+        title, body, ok = NoteInputDialog.get_note(self)
+        if ok:
+            self.notes.add(title, body)
+
     def set_permission_mode(self, mode):
         if mode not in {"ask", "allow", "block"} or mode == self.permission_mode:
             return
@@ -1265,6 +1690,9 @@ class BrowserWindow(QMainWindow):
         self._save_session()
         self.history.close()
         self.bookmarks.close()
+        self.todos.close()
+        self.kanban.close()
+        self.notes.close()
         # Eski profil nesnesi acik sayfalar yok edilene kadar yasamali.
         self._retired_profiles.append(self.web_profile)
 
@@ -1402,6 +1830,7 @@ class BrowserWindow(QMainWindow):
         # Acik sekmeler kaybolmasin: oturumu kaydet, kabugu kur, geri yukle.
         if self._fan_overlay is not None:
             self._fan_overlay.dismiss()
+        self.browser_chrome_hidden = False
         self._save_session()
 
         Theme.configure(self.theme_mode)
@@ -1411,7 +1840,10 @@ class BrowserWindow(QMainWindow):
 
         old_central = self.centralWidget()
         self.current_view = None
-        self.setCentralWidget(self._build_main_shell())
+        new_central = self._build_main_shell()
+        self.setCentralWidget(new_central)
+        if self.isVisible():
+            new_central.show()
         if old_central:
             old_central.deleteLater()
         self._restore_session()
@@ -1842,6 +2274,9 @@ class BrowserWindow(QMainWindow):
         new_view.page().loadingChanged.connect(
             lambda info, view=new_view: self._handle_load_status(view, info)
         )
+        new_view.page().scrollPositionChanged.connect(
+            lambda position, view=new_view: self._handle_scroll_position(view, position)
+        )
         self.privacy.attach_tab(new_view)
 
         index = self.tabs.add_tab(url, title)
@@ -2082,7 +2517,7 @@ class BrowserWindow(QMainWindow):
         self._load_internal_page(self.current_view, page_key)
 
     INTERNAL_PAGES = {
-        "newtab", "settings", "about", "history", "bookmarks", "downloads", "error",
+        "newtab", "settings", "about", "history", "bookmarks", "downloads", "tasks", "notes", "error",
     }
 
     def _load_internal_page(self, view, page_key):
@@ -2139,6 +2574,8 @@ class BrowserWindow(QMainWindow):
             "history": "Geçmiş",
             "bookmarks": "Favoriler",
             "downloads": "İndirilenler",
+            "tasks": "Görev Tahtası",
+            "notes": "Notlar",
             "error": "Hata",
         }.get(page_key, "Yeni Sekme")
 
@@ -2153,6 +2590,10 @@ class BrowserWindow(QMainWindow):
             return self._bookmarks_page_html()
         if page_key == "downloads":
             return self._downloads_page_html()
+        if page_key == "tasks":
+            return self._tasks_page_html()
+        if page_key == "notes":
+            return self._notes_page_html()
         if page_key == "error":
             return self._error_page_html()
         return self._new_tab_html()
@@ -2191,6 +2632,37 @@ class BrowserWindow(QMainWindow):
                 elif action == "show":
                     self.downloads.open_folder(entry_id)
             self._load_internal_page(view, "downloads")
+            return
+        if key == "tasks" and action in {"add", "move", "remove"}:
+            if action == "add":
+                column = query.queryItemValue("column").strip()
+
+                def _run(v=view, col=column):
+                    self.add_kanban_card(col)
+                    self._load_internal_page(v, "tasks")
+
+                QTimer.singleShot(0, _run)
+                return
+            entry_id = query.queryItemValue("id")
+            if entry_id.isdigit():
+                if action == "move":
+                    self.kanban.move(int(entry_id), query.queryItemValue("to").strip())
+                elif action == "remove":
+                    self.kanban.remove(int(entry_id))
+            self._load_internal_page(view, "tasks")
+            return
+        if key == "notes" and action in {"add", "remove"}:
+            if action == "add":
+                def _run(v=view):
+                    self.add_note()
+                    self._load_internal_page(v, "notes")
+
+                QTimer.singleShot(0, _run)
+                return
+            entry_id = query.queryItemValue("id")
+            if entry_id.isdigit():
+                self.notes.remove(int(entry_id))
+            self._load_internal_page(view, "notes")
             return
         if key == "settings" and action == "profile":
             name = query.queryItemValue("name").strip()
@@ -2815,6 +3287,279 @@ class BrowserWindow(QMainWindow):
             <p class="subtitle">Bu oturumdaki indirmeler. Kayıtlar uygulama kapanınca sıfırlanır.</p>
             {refresh_row}
             <section class="rows">{body}</section>
+          </main>
+        </body>
+        </html>
+        """
+
+    def _tasks_page_html(self):
+        board = self.kanban.by_column()
+        column_html = []
+        for column_key in KanbanStore.columns:
+            label = KanbanStore.column_labels[column_key]
+            cards = []
+            for card_id, title, _created_at in board[column_key]:
+                safe_title = html_module.escape(title)
+                move_links = []
+                for target in KanbanStore.columns:
+                    if target == column_key:
+                        continue
+                    target_label = KanbanStore.column_labels[target]
+                    move_links.append(
+                        f'<a class="action" href="tabx://tasks/move?id={card_id}&to={target}">{target_label}</a>'
+                    )
+                cards.append(
+                    f"""
+                    <article class="task-card">
+                      <p>{safe_title}</p>
+                      <div class="task-actions">
+                        {''.join(move_links)}
+                        <a class="action danger" href="tabx://tasks/remove?id={card_id}">Sil</a>
+                      </div>
+                    </article>
+                    """
+                )
+            body = (
+                "\n".join(cards)
+                if cards
+                else '<p class="empty compact">Bu kolonda kart yok.</p>'
+            )
+            column_html.append(
+                f"""
+                <section class="kanban-column">
+                  <div class="kanban-head">
+                    <h2>{label}</h2>
+                    <span>{len(board[column_key])}</span>
+                  </div>
+                  <div class="kanban-cards">{body}</div>
+                  <a class="add-card" href="tabx://tasks/add?column={column_key}">+ Kart ekle</a>
+                </section>
+                """
+            )
+        kanban_css = """
+            main.wide { width: min(1180px, calc(100vw - 64px)); }
+            .kanban {
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 14px;
+              align-items: start;
+            }
+            .kanban-column {
+              min-height: 420px;
+              border: 1px solid var(--line);
+              border-radius: 18px;
+              background: var(--card);
+              padding: 14px;
+              box-shadow: 0 16px 38px rgba(36, 43, 65, .06);
+            }
+            .kanban-head {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 12px;
+              margin-bottom: 12px;
+            }
+            .kanban-head h2 {
+              margin: 0;
+              font-size: 14px;
+              letter-spacing: 0;
+            }
+            .kanban-head span {
+              color: var(--muted);
+              font-size: 12px;
+              font-weight: 800;
+            }
+            .kanban-cards {
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+              min-height: 300px;
+            }
+            .task-card {
+              border: 1px solid var(--line);
+              border-radius: 12px;
+              background: __BUTTON__;
+              padding: 12px;
+            }
+            .task-card p {
+              margin: 0 0 10px;
+              color: var(--text);
+              font-size: 13px;
+              font-weight: 700;
+              line-height: 1.35;
+              overflow-wrap: anywhere;
+            }
+            .task-actions {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 6px;
+            }
+            a.action, .add-card {
+              color: var(--muted);
+              text-decoration: none;
+              font-size: 12px;
+              font-weight: 800;
+              border: 1px solid var(--line);
+              border-radius: 999px;
+              padding: 6px 9px;
+            }
+            a.action:hover, .add-card:hover { color: var(--purple); border-color: var(--purple); }
+            a.danger:hover { color: #c0392b; border-color: #c0392b; }
+            .add-card {
+              display: inline-flex;
+              margin-top: 12px;
+            }
+            .empty.compact {
+              padding: 10px 2px;
+              font-size: 12px;
+            }
+            @media (max-width: 900px) {
+              .kanban { grid-template-columns: 1fr; }
+              .kanban-column { min-height: auto; }
+              .kanban-cards { min-height: auto; }
+            }
+        """.replace("__BUTTON__", Theme.button)
+        return f"""
+        <!doctype html>
+        <html lang="tr">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Görev Tahtası</title>
+          <style>{self._internal_page_base_css()}{kanban_css}</style>
+        </head>
+        <body>
+          <main class="wide">
+            <p class="eyebrow">F5 Productivity</p>
+            <h1>Görev Tahtası</h1>
+            <p class="subtitle">'{html_module.escape(self.profile_name)}' profiline ait basit Kanban board. Kartlar yerel SQLite'ta saklanır.</p>
+            <section class="kanban">{''.join(column_html)}</section>
+          </main>
+        </body>
+        </html>
+        """
+
+    def _notes_page_html(self):
+        rows = []
+        for note_id, title, body, updated_at in self.notes.all():
+            safe_title = html_module.escape(title)
+            safe_body = html_module.escape(body)
+            stamp = datetime.fromtimestamp(updated_at).strftime("%d.%m.%Y %H:%M")
+            body_html = (
+                f'<pre>{safe_body}</pre>'
+                if safe_body
+                else '<p class="note-empty">İçerik yok.</p>'
+            )
+            rows.append(
+                f"""
+                <article class="note-card">
+                  <div class="note-head">
+                    <h2>{safe_title}</h2>
+                    <span>{stamp}</span>
+                  </div>
+                  {body_html}
+                  <div class="note-actions">
+                    <a class="action danger" href="tabx://notes/remove?id={note_id}">Sil</a>
+                  </div>
+                </article>
+                """
+            )
+        body = (
+            "\n".join(rows)
+            if rows
+            else '<p class="empty">Henüz not yok. Yeni bir not ekleyerek başlayabilirsin.</p>'
+        )
+        notes_css = """
+            main.wide { width: min(1080px, calc(100vw - 64px)); }
+            .notes-toolbar {
+              display: flex;
+              justify-content: flex-end;
+              margin: 0 0 14px;
+            }
+            .notes-grid {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 14px;
+            }
+            .note-card {
+              border: 1px solid var(--line);
+              border-radius: 18px;
+              background: var(--card);
+              padding: 16px;
+              box-shadow: 0 16px 38px rgba(36, 43, 65, .06);
+            }
+            .note-head {
+              display: flex;
+              align-items: flex-start;
+              justify-content: space-between;
+              gap: 12px;
+              margin-bottom: 10px;
+            }
+            .note-head h2 {
+              margin: 0;
+              font-size: 15px;
+              line-height: 1.25;
+              letter-spacing: 0;
+              overflow-wrap: anywhere;
+            }
+            .note-head span {
+              flex: none;
+              color: var(--muted);
+              font-size: 12px;
+              white-space: nowrap;
+            }
+            .note-card pre {
+              margin: 0;
+              white-space: pre-wrap;
+              overflow-wrap: anywhere;
+              color: var(--muted);
+              font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, Arial, sans-serif;
+              font-size: 13px;
+              line-height: 1.5;
+            }
+            .note-empty {
+              margin: 0;
+              color: var(--muted);
+              font-size: 13px;
+            }
+            .note-actions {
+              display: flex;
+              justify-content: flex-end;
+              margin-top: 14px;
+            }
+            a.action, .add-note {
+              color: var(--muted);
+              text-decoration: none;
+              font-size: 12px;
+              font-weight: 800;
+              border: 1px solid var(--line);
+              border-radius: 999px;
+              padding: 7px 11px;
+            }
+            a.action:hover, .add-note:hover { color: var(--purple); border-color: var(--purple); }
+            a.danger:hover { color: #c0392b; border-color: #c0392b; }
+            @media (max-width: 840px) {
+              .notes-grid { grid-template-columns: 1fr; }
+            }
+        """
+        return f"""
+        <!doctype html>
+        <html lang="tr">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Notlar</title>
+          <style>{self._internal_page_base_css()}{notes_css}</style>
+        </head>
+        <body>
+          <main class="wide">
+            <p class="eyebrow">F5 Productivity</p>
+            <h1>Notlar</h1>
+            <p class="subtitle">'{html_module.escape(self.profile_name)}' profiline ait local Markdown notları. İlk dilimde içerik düz metin olarak gösterilir.</p>
+            <div class="notes-toolbar">
+              <a class="add-note" href="tabx://notes/add">+ Not ekle</a>
+            </div>
+            <section class="notes-grid">{body}</section>
           </main>
         </body>
         </html>

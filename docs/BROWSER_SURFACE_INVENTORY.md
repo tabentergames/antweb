@@ -37,8 +37,8 @@ Bu belge, bir masaustu tarayicida beklenen menu, sayfa, panel ve temel islev yuz
 | `tabx://extensions` | TabX eklentileri | F3 | Yok | Yerel plugin listesi, ac/kapat. |
 | `tabx://privacy` | Gizlilik merkezi | F3 | Yok | Tracker engelleme durumu, izinler. |
 | `tabx://workspace` | Workspace yonetimi | F4 | Yok | Workspace listesi ve oturumlar. |
-| `tabx://notes` | Notlar | F5 | Yok | Local markdown not listesi. |
-| `tabx://tasks` | Todo/Kanban | F5 | Yok | Basit todo ve kolonlar. |
+| `tabx://notes` | Notlar | F5 | Var | Local Markdown not listesi; ekle/listele/sil. |
+| `tabx://tasks` | Todo/Kanban | F5 | Var | Kanban board: backlog/doing/done kolonlari, kart ekle/tasi/sil. |
 | `tabx://devtools` | Gelistirici merkezi | F6 | Yok | Snippet, user-agent, request log. |
 | `tabx://about` | Hakkinda | F2 | Kismen var | Ilk sayfa yuzeyi var; surum ve build bilgisi otomatik degil. |
 

@@ -15,7 +15,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QPointF, QTimer, QUrl
 from PyQt6.QtWidgets import QApplication
 
 from core.browser_window import BrowserWindow
@@ -46,6 +46,23 @@ def run() -> int:
     window.toggle_theme_mode()
     window.toggle_theme_mode()
 
+    # Power UX — scroll ile tab strip + toolbar auto-hide, ust kenarda geri acilir.
+    window.hide_browser_chrome()
+    assert window.browser_chrome_hidden is True, "browser chrome gizlenmedi"
+    assert window.tabs.height() == 0 and window.toolbar.height() == 0, (
+        "chrome yukseklikleri sifirlanmadi"
+    )
+    assert window.chrome_reveal_hotspot.isVisible(), "chrome reveal hotspot acilmadi"
+    window.show_browser_chrome()
+    assert window.browser_chrome_hidden is False, "browser chrome geri acilmadi"
+    assert window.tabs.height() == window.TAB_STRIP_HEIGHT, "tab strip yuksekligi donmedi"
+    assert window.toolbar.height() == window.TOOLBAR_HEIGHT, "toolbar yuksekligi donmedi"
+    window._handle_scroll_position(window.current_view, QPointF(0, 0))
+    window._handle_scroll_position(window.current_view, QPointF(0, 140))
+    assert window.browser_chrome_hidden is True, "asagi scroll chrome'u gizlemedi"
+    window._handle_scroll_position(window.current_view, QPointF(0, 90))
+    assert window.browser_chrome_hidden is False, "yukari scroll chrome'u acmadi"
+
     # F4 — history/bookmark store'lari
     window.history.record("https://example.com", "Example")
     assert window.history.recent(), "history kaydi yazilmadi"
@@ -54,7 +71,7 @@ def run() -> int:
     assert not window.bookmarks.toggle("https://example.com"), "bookmark toggle silmedi"
 
     # F4 — ic sayfalar HTML uretimi
-    for key in ("history", "bookmarks", "settings"):
+    for key in ("history", "bookmarks", "settings", "tasks", "notes"):
         assert "<h1>" in window._internal_page_html(key), f"{key} sayfasi bos"
 
     # F4 — workspace gecisi
@@ -72,8 +89,63 @@ def run() -> int:
     window._populate_profile_menu()
     assert window.profile_menu.actions(), "profil menusu bos"
 
+    # F5 — floating todo widget + SQLite store.
+    todo_id = window.todos.add("Smoke görev")
+    assert todo_id is not None, "todo eklenemedi"
+    todos = window.todos.all()
+    assert any(item[0] == todo_id and item[1] == "Smoke görev" for item in todos), (
+        "todo store kaydi okunamadi"
+    )
+    window.todos.set_completed(todo_id, True)
+    assert any(item[0] == todo_id and item[2] is True for item in window.todos.all()), (
+        "todo tamamlandi durumu yazilmadi"
+    )
+    window.toggle_todo_widget(True)
+    assert window.todo_panel.isVisible(), "todo panel acilmadi"
+    window.todo_panel.input.setText("Panel görev")
+    window.todo_panel.add_from_input()
+    assert any(item[1] == "Panel görev" for item in window.todos.all()), (
+        "todo panel gorev eklemedi"
+    )
+    window.toggle_todo_widget(False)
+    assert not window.todo_panel.isVisible(), "todo panel kapanmadi"
+    for item_id, title, _done, _created in list(window.todos.all()):
+        if title in {"Smoke görev", "Panel görev"}:
+            window.todos.remove(item_id)
+
+    # F5 — Kanban board store + tabx://tasks komutlari.
+    card_id = window.kanban.add("Smoke kart", "backlog")
+    assert card_id is not None, "kanban karti eklenemedi"
+    board = window.kanban.by_column()
+    assert any(card[0] == card_id for card in board["backlog"]), "kanban backlog kaydi yok"
+    tasks_html = window._internal_page_html("tasks")
+    assert "Görev Tahtası" in tasks_html and "Smoke kart" in tasks_html, (
+        "tasks sayfasi kanban kartini gostermiyor"
+    )
+    window._handle_internal_url(window.current_view, QUrl(f"tabx://tasks/move?id={card_id}&to=doing"))
+    assert any(card[0] == card_id for card in window.kanban.by_column()["doing"]), (
+        "kanban move komutu calismadi"
+    )
+    window._handle_internal_url(window.current_view, QUrl(f"tabx://tasks/remove?id={card_id}"))
+    assert all(
+        card[0] != card_id
+        for cards in window.kanban.by_column().values()
+        for card in cards
+    ), "kanban remove komutu calismadi"
+
+    # F5 — local notes store + tabx://notes komutlari.
+    note_id = window.notes.add("Smoke not", "Markdown **icerik**")
+    assert note_id is not None, "not eklenemedi"
+    notes_html = window._internal_page_html("notes")
+    assert "Notlar" in notes_html and "Smoke not" in notes_html, (
+        "notes sayfasi notu gostermiyor"
+    )
+    window._handle_internal_url(window.current_view, QUrl(f"tabx://notes/remove?id={note_id}"))
+    assert all(note[0] != note_id for note in window.notes.all()), (
+        "notes remove komutu calismadi"
+    )
+
     # F2.5 — reduced motion ayari: toggle + tabx://settings komut linki + kalicilik.
-    from PyQt6.QtCore import QUrl
     from core.browser_window import UiStateStore
 
     assert window.reduced_motion is False, "varsayilan reduced_motion False olmali"

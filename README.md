@@ -82,6 +82,7 @@ Mevcut tarayıcılardan en iyi özellikleri alıp bunlara yenilerini ekleyerek o
 - **Fan sekme modu** — Ekranın köşesinde 90° yarım daire şeklinde açılan yenilikçi sekme görünümü
 - **Opera tarzı uygulama çubuğu** — Tam özelleştirilebilir, sürükle-bırak ile düzenlenebilir
 - **Tema motoru** — Açık / koyu mod ve tamamen özel renk paleti desteği
+- **Scroll auto-hide chrome** — Aşağı kayarken sekme çubuğu ve adres çubuğu gizlenir; yukarı kayınca veya üst kenara mouse gelince geri açılır
 - **Kısayol editörü** — TabX'e özel tüm klavye kısayollarını özelleştir
 - **Widget tabanlı başlangıç sayfası** — Saat, hava durumu, hızlı bağlantılar ve daha fazlası
 - **TabX eklenti sistemi** — JS/CSS injection tabanlı kendi hafif eklenti mimarisi (ad-blocker, çeviri, not vb. yerleşik eklentiler olarak çalışır)
@@ -112,8 +113,9 @@ Mevcut tarayıcılardan en iyi özellikleri alıp bunlara yenilerini ekleyerek o
 
 ### ✅ Productivity Araçları
 
-- **Todo list** — Floating widget olarak her sayfadan erişilebilir görev listesi
-- **Scrum / Kanban board** — Sürükle-bırak ile tam proje yönetimi
+- **Todo list** — Toolbar `✓` ile açılan floating widget; görevler profil bazlı SQLite'ta saklanır
+- **Scrum / Kanban board** — `tabx://tasks` üzerinde backlog / doing / done kolonları; kartlar profil bazlı SQLite'ta saklanır
+- **Not sistemi** — `tabx://notes` üzerinde local Markdown notları; ilk sürümde ekle/listele/sil
 - **Zaman takibi** — Görev bazlı timer ve günlük/haftalık raporlar
 - **Takvim görünümü** — Görevleri ve sprint'leri takvim üzerinde planlama
 - **Sprint yönetimi** — Backlog, aktif sprint ve tamamlanan görevler
@@ -141,7 +143,7 @@ Mevcut tarayıcılardan en iyi özellikleri alıp bunlara yenilerini ekleyerek o
 | **v0.2** — Görsel & Sekmeler       | Tema kabuğu başladı; fan sekme modu ve esnek sekme konumu sırada    | 🔄 Geliştiriliyor |
 | **v0.3** — Gizlilik Katmanı        | TabX eklenti sistemi, ad/tracker blocking, HTTPS upgrade, izinler   | 📋 Planlandı      |
 | **v0.4** — Profil & Workspace      | Çoklu profil, workspace, oturum kaydetme, sekme grupları            | 📋 Planlandı      |
-| **v0.5** — Productivity            | Todo, Kanban board, zaman takibi, takvim (floating widget'lar)      | 📋 Planlandı      |
+| **v0.5** — Productivity            | Todo, Kanban board, zaman takibi, takvim (floating widget'lar)      | 🔄 Başladı        |
 | **v0.6** — Geliştirici Araçları    | Terminal, kodlama modu, snippet kütüphanesi, istek yakalama         | 📋 Planlandı      |
 | **v1.0** — Kararlı Sürüm           | Firma içi pilot tamamlandı, performans optimizasyonu, cross-platform | 🎯 Hedef          |
 | **v2.0** — Bulut & Premium         | Bulut sync, takım workspace'leri, premium özellikler                | 💡 Vizyon         |

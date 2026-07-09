@@ -1,6 +1,6 @@
 # Current State
 
-Son guncelleme: 2026-07-08
+Son guncelleme: 2026-07-09
 
 ## Repodaki gercek durum
 
@@ -58,6 +58,11 @@ Son guncelleme: 2026-07-08
   - **tabx:// yonlendirme:** `TabXPage.acceptNavigationRequest` ic linkleri sinyalle kabuga tasir (`_handle_internal_url`); komut linkleri: `history/clear`, `bookmarks/remove?id=`, `settings/profile?name=`, `settings/profile-new`, `settings/reduced-motion`, `settings/ad-block`, `settings/https-upgrade`, `settings/permission-mode?value=`.
   - **F2.5 reduced-motion ayari:** `tabx://settings` "Hareket" karti — `toggle_reduced_motion()` `Motion.configure` cagirir, `UiStateStore`'a `reduced_motion` alanini yazar; `BrowserWindow.__init__` acilista `Theme.configure` sonrasi `Motion.configure(not self.reduced_motion)` ile tercihi uygular.
   - **F2.5 glass yuzey gecisi:** `TextInputDialog`/`ConfirmDialog` arka plani `Theme.panel` yerine `Theme.glass_strong` + kenarlik `Theme.glass_border`; offscreen render ile pixel/alfa dogrulandi (light+dark). Sidebar/rail/tab-strip docked yuzeyler oldugundan kapsam disi (DESIGN_SYSTEM §2 yalnizca floating/overlay yuzeyleri kapsiyor); toolbar zaten `Theme.toolbar` yari saydam tokenini kullaniyor.
+  - **F7 — Scroll auto-hide browser chrome:** her sekmede `page().scrollPositionChanged` dinlenir. Asagi scroll'da tab strip + toolbar `maximumHeight` animasyonuyla 0'a iner, yukari scroll veya ust kenar `ChromeRevealHotspot` hover'i geri acar. Webview'e efekt uygulanmaz; reduced-motion'da yukseklik aninda degisir.
+  - **F5 — Floating todo widget:** `features/productivity/todo_store.py` profil bazli SQLite (`data/productivity-<profil>.db`) kullanir. Toolbar `✓` butonu `TodoFloatingPanel` glass overlay'ini acar/kapatir; gorev ekleme, tamamlandi isaretleme ve hover-reveal silme calisir. Panel merkez widget'a parent'li overlay'dir, webview'e efekt uygulanmaz; `Motion.enabled=False` yolunda aninda acilip kapanir.
+  - **F5 — Kanban board:** `features/productivity/kanban_store.py` ayni profil bazli SQLite dosyasinda `kanban_cards` tablosunu kullanir. `tabx://tasks` ic sayfasi backlog/doing/done kolonlarini gosterir; kart ekleme modal dialog ile, tasima/silme ic sayfa komut linkleriyle calisir. Sol panel ve `⋯` menuden erisilir.
+  - **F5 — Not sistemi:** `features/productivity/notes_store.py` ayni profil bazli SQLite dosyasinda `notes` tablosunu kullanir. `tabx://notes` ic sayfasi notlari listeler; `NoteInputDialog` ile baslik+Markdown metni eklenir, silme ic sayfa komut linkiyle calisir. Markdown ilk dilimde parser'siz, pre-wrap duz metin olarak gosterilir.
+  - **Urun notu — moduler/yer degistirilebilir yapi:** panel, widget, arac ve uretkenlik yuzeyleri ileride farkli konuma/erisime alinabilecek sekilde bagimsiz tasarlanmalidir. Bu not `memory-bank/project-brief.md` ve `docs/AGENT_WORKFLOW.md` icine islendi.
 
 ## Ana teknik borc
 
@@ -68,7 +73,7 @@ Son guncelleme: 2026-07-08
 - Favicon'lar oturumlar arasi cache'lenmiyor (her sayfa yuklendiginde yeniden gelir). Omnibox onerileri/gecmis tamamlama yok (arama motoru secimi var).
 - History'de arama/filtre, bookmark'ta etiket/klasor yok; ilk dilim bilincli olarak sade.
 - Test paketi olarak yalnizca `scripts/smoke_test.py` var; `tests/` altinda state-store ve motion testleri eklenmeli.
-- F2.5 kapandi. Tab strip artik Motion tokenlarini kullaniyor; toolbar ve dialoglar ile tab strip'in SPACE/RADIUS geometri degerleri hala ciplak (kademeli goc surecek), ancak yeni F2.5 isi acmadan once F5/F6/F7 faz secimi yapilmali.
+- F5 devam ediyor; floating todo widget, Kanban board ve not sistemi tamamlandi. Siradaki F5 dilimi web clipper.
 
 ## Cikis kriteri
 

@@ -73,9 +73,9 @@ Kullanici geri bildirimiyle acildi (2026-07-07): sag panel/toolbar/ayarlar sadel
 
 | Durum | Is | Not |
 | --- | --- | --- |
-| todo | Floating todo widget | Kapatilabilir modul; SQLite saklama. |
-| todo | Kanban board | Basit kolonlar: backlog, doing, done. |
-| todo | Not sistemi | Markdown destekli local notlar. |
+| done | Floating todo widget | Toolbar `✓` ile acilan glass overlay; profil bazli SQLite (`features/productivity/todo_store.py`), ekle/tamamla/sil. |
+| done | Kanban board | `tabx://tasks` ic sayfasi; profil bazli SQLite (`features/productivity/kanban_store.py`), backlog/doing/done kolonlari, ekle/tasi/sil. |
+| done | Not sistemi | `tabx://notes` ic sayfasi; profil bazli SQLite (`features/productivity/notes_store.py`), baslik+Markdown metni ekle/listele/sil. |
 | todo | Web clipper | Secim veya sayfa metni kaydetme. |
 
 ## F6 - Developer Tools
@@ -93,6 +93,7 @@ Her biri kapatilabilir modul olarak `features/` altina gider; cekirdege gomulmez
 
 | Durum | Is | Not |
 | --- | --- | --- |
+| done | Scroll auto-hide browser chrome | Asagi scroll'da tab strip + toolbar yuksekligi animasyonla 0'a iner; yukari scroll veya ust kenar hotspot hover'i geri acar. Webview'e efekt uygulanmaz. |
 | todo | Split view | Iki sekmeyi yan yana gosterme; QSplitter + snapshot gecis animasyonu. |
 | todo | Video pop-out | Videoyu her zaman ustte kucuk pencereye alma (picture-in-picture). |
 | todo | Sidebar web panelleri | Opera tarzi: sol rail'e sabitlenen dar webview panelleri (WhatsApp/Telegram vb.). |

@@ -33,6 +33,10 @@ Bu yüzden **çalışan, gösterilebilir, küçük ama sağlam** parçalar üret
 - **Çekirdek (`core/`)** her zaman hızlı ve stabil kalır. Çekirdeğe özellik tıkıştırma.
 - Her özellik **bağımsız bir modüldür** (`features/...`). Modüller çekirdeğe gevşek bağlıdır (loose coupling).
 - Kullanıcı bir modülü kapatabilmeli → "şişme" (bloat) olmamalı.
+- TabX yüzeyleri **yer değiştirebilir** tasarlanır: panel, widget, araç ve
+  üretkenlik yüzeyleri ileride kullanıcı tarafından farklı konuma/erişim
+  biçimine alınabilecek kadar bağımsız tutulur. Yeni UI işi sabit tek konuma
+  kilitlenmiş varsayımlar üretmemeli.
 
 ### 2.2 Teknoloji sınırları (KESİN)
 
