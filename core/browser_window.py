@@ -727,6 +727,10 @@ class BrowserTab(QWebEngineView):
                 "✂  Seçimi kopyala",
                 lambda: self.pageAction(QWebEnginePage.WebAction.Copy).trigger(),
             )
+            menu.addAction(
+                "📌  Nota kaydet",
+                lambda: self._shell.clip_to_note(selected_text),
+            )
 
         menu.addSeparator()
         menu.addAction(
@@ -1667,6 +1671,23 @@ class BrowserWindow(QMainWindow):
             cancel_label="Reddet",
             confirm_label="İzin ver",
         )
+
+    def clip_to_note(self, selected_text: str) -> None:
+        """Secili metni not olarak kaydeder."""
+        # Aktif sekmenin basligini otomatik title olarak kullan
+        current_tab = self.tabs.currentWidget()
+        page_title = current_tab.title() if current_tab else "TabX"
+        
+        # Nota ekle dialogu ac
+        note_text, ok = NoteInputDialog.get_note(self)
+        if not ok:
+            return
+        title, body = note_text
+        
+        # Body'e secili metni ekleyip duzenle
+        if selected_text.strip():
+            body = f"{body}\n\n---\nSecili metin ({page_title}):\n{selected_text}".strip()
+        self.notes.add(title, body)
 
     # ------------------------------------------------------------------
     # F4 — profil ve workspace
