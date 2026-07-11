@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.pycache_tmp/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# PyInstaller/build outputs
+build/
+dist/
+*.spec.bak
+TabX.app/
+
+# macOS
+.DS_Store
+
+# Local logs
+*.log
+
+# Local user state
+data/ui_state.json
+
+# F4 local data (session, history, bookmarks, profiles)
+data/sessions.json
+data/library-*.db
+data/profiles/
