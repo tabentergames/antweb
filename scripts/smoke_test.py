@@ -472,6 +472,45 @@ def run() -> int:
     assert window.web_profile.httpUserAgent() == default_ua, "varsayilan UA geri donmedi"
     window.user_agent.set_mode(original_ua_mode, original_custom_ua)
 
+    # F6 — request capture privacy interceptor zincirini bozmadan log toplar.
+    from PyQt6.QtCore import QByteArray
+    from PyQt6.QtWebEngineCore import QWebEngineUrlRequestInfo
+
+    class _FakeRequestInfo:
+        def requestMethod(self):
+            return QByteArray(b"POST")
+
+        def resourceType(self):
+            return QWebEngineUrlRequestInfo.ResourceType.ResourceTypeXhr
+
+        def requestUrl(self):
+            return QUrl("https://user:secret@example.com/api?q=tabx")
+
+        def firstPartyUrl(self):
+            return QUrl("https://example.com/app")
+
+    fake_info = _FakeRequestInfo()
+    window.request_capture.set_enabled(True)
+    window.privacy._interceptor.interceptRequest(fake_info)
+    request_entries = window.request_capture.entries()
+    assert len(request_entries) == 1, "request capture zincirden kayit almadi"
+    assert request_entries[0].method == "POST", "request metodu yanlis"
+    assert request_entries[0].resource_type == "Xhr", "resource type yanlis"
+    assert "secret" not in request_entries[0].url, "URL parolasi log'a sizdi"
+    assert "example.com/api?q=tabx" in request_entries[0].url, "request URL eksik"
+
+    request_window = window.open_request_capture()
+    request_window.refresh()
+    assert request_window.table.topLevelItemCount() == 1, (
+        "request penceresi kaydi gostermiyor"
+    )
+    window.request_capture.set_enabled(False)
+    window.privacy._interceptor.interceptRequest(fake_info)
+    assert len(window.request_capture.entries()) == 1, "kapali capture kayit aldi"
+    window.request_capture.clear()
+    assert not window.request_capture.entries(), "request log temizlenmedi"
+    window.request_capture.close_window()
+
     # Arama motoru secimi — kalicilik + search_url + adres cubugu fallback'i.
     original_search_engine = window.search_engine
     window.set_search_engine("google")

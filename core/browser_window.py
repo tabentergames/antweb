@@ -31,6 +31,7 @@ from features.privacy.service import PrivacyService
 from features.downloads.manager import DownloadManager
 from features.devtools import (
     DevToolsController,
+    RequestCaptureController,
     SnippetController,
     UserAgentController,
 )
@@ -821,7 +822,10 @@ class BrowserWindow(QMainWindow):
         profile.setCachePath(str(data_dir / "cache"))
         self.web_profile = profile
         self.user_agent = UserAgentController(self.profile_name, profile, self)
-        self.privacy = PrivacyService(profile)
+        self.request_capture = RequestCaptureController(self)
+        self.privacy = PrivacyService(
+            profile, request_observers=[self.request_capture.interceptor]
+        )
         self.privacy.set_ad_block_enabled(self.ad_block_enabled)
         self.privacy.set_https_upgrade_enabled(self.https_upgrade_enabled)
         self.downloads.attach_profile(profile)
@@ -871,6 +875,7 @@ class BrowserWindow(QMainWindow):
         self.devtools.close()
         self.snippets.close()
         self.user_agent.close()
+        self.request_capture.close()
         self.current_view = None
         self.todos.close()
         self.kanban.close()
@@ -1143,6 +1148,7 @@ class BrowserWindow(QMainWindow):
         more_menu.addAction("⌁  Geliştirici araçları", self.open_devtools)
         more_menu.addAction("⌘  Snippet kütüphanesi", self.open_snippet_library)
         more_menu.addAction("◎  User-agent", self.open_user_agent_dialog)
+        more_menu.addAction("↗  Ağ istekleri", self.open_request_capture)
         more_menu.addAction("⚙  Ayarlar", lambda: self.open_internal_page("settings"))
         more_menu.addAction("?  Hakkında", lambda: self.open_internal_page("about"))
         more_btn.setMenu(more_menu)
@@ -1747,6 +1753,7 @@ class BrowserWindow(QMainWindow):
         self.notes.close()
         self.snippets.close()
         self.user_agent.close()
+        self.request_capture.close()
         # Eski profil nesnesi acik sayfalar yok edilene kadar yasamali.
         self._retired_profiles.append(self.web_profile)
 
@@ -1885,6 +1892,7 @@ class BrowserWindow(QMainWindow):
         # Acik sekmeler kaybolmasin: oturumu kaydet, kabugu kur, geri yukle.
         self.devtools.close()
         self.snippets.close_window()
+        self.request_capture.close_window()
         if self._fan_overlay is not None:
             self._fan_overlay.dismiss()
         self.browser_chrome_hidden = False
@@ -2528,6 +2536,10 @@ class BrowserWindow(QMainWindow):
     def open_user_agent_dialog(self) -> bool:
         """Aktif profil icin user-agent secim modalini acar."""
         return self.user_agent.open_dialog()
+
+    def open_request_capture(self):
+        """Aktif profil icin oturumluk ag istekleri penceresini acar."""
+        return self.request_capture.open()
 
     # ------------------------------------------------------------------
     # Klavye kisayollari

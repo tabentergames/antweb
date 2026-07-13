@@ -4,6 +4,16 @@ Son guncelleme: 2026-07-13
 
 ## Son kararlar
 
+- **F6 network/request capture tamamlandi; F6 FAZI KAPANDI (2026-07-13):**
+  `features/devtools/request_capture.py` varsayilan kapali bir
+  `QWebEngineUrlRequestInterceptor` observer'i, oturum ici 500 kayitlik log ve
+  ayrik/tasinabilir `RequestLogWindow` saglar. URL, metot ve resource type
+  goruntulenir; filtreleme, temizleme ve baslat/durdur vardir. URL icindeki
+  kullanici adi/parola logdan temizlenir. Observer, `PrivacyService`in tek
+  profil interceptor zincirine generic olarak eklenir; privacy modulu F6
+  implementasyonuna baglanmaz ve istek degistirilmez. Profil/tema/uygulama
+  gecislerinde pencere ile capture guvenli kapanir. Smoke test zincirden kayit,
+  hassas URL temizligi, panel, devre disi modu ve temizlemeyi dogrular.
 - **F6 profil bazli user-agent gecisi tamamlandi (2026-07-13):**
   `features/devtools/user_agent.py` ayni `data/devtools-<profil>.db` icinde
   `developer_settings` tablosuyla `default`/`mobile`/`custom` modlarini saklar.
@@ -325,11 +335,10 @@ Son guncelleme: 2026-07-13
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-"Temel tarayici yuzeyleri", F2.5, F3 ve F5 fazlari KAPANDI. F6 Developer
-Tools basladi; DevTools penceresi, snippet kutuphanesi ve profil bazli
-user-agent gecisi tamamlandi. F6'yi kapatacak son `todo` request capture'dir:
-varsayilan kapali, oturum ici sinirli log, URL/metot/resource type gorunumu ve
-temizleme/baslat-durdur eylemleriyle kucuk tutulmali.
+"Temel tarayici yuzeyleri", F2.5, F3, F5 ve F6 fazlari KAPANDI. Siradaki urun
+fazi backlog'daki F7 Power UX'tir. Ilk aday olarak komut paleti secilebilir;
+alternatif olarak `docs/AGENT_WORKFLOW.md` planina gore AI katmani F6 sonrasinda
+ele alinabilir, ancak once kapsam karari verilmelidir.
 
 Kullanici F7 isterse komut paleti iyi ilk adaydir:
 FanOverlay'in scrim+glass+ESC/dis-tiklama deseni, `_setup_shortcuts`
@@ -339,9 +348,6 @@ Net teslim kriteri:
 
 - F7 komut paleti secilirse `FanOverlay` scrim/glass/ESC desenini kullan;
   komutlar sekme/ayar/ic sayfa acma gibi mevcut calisan yuzeylerle sinirli kalsin.
-- F6 request capture, mevcut tek profil interceptor slotunu bozmadan
-  `PrivacyService` zincirine generic observer olarak eklenmeli; F6 modulu
-  privacy implementasyonuna gomulmemeli.
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
 
 Birikmis kucuk iyilestirmeler (istenirse ayri dilimler): kalici indirme

@@ -26,12 +26,20 @@ from features.extensions.runtime import ExtensionRuntime
 class _ChainedInterceptor(QWebEngineUrlRequestInterceptor):
     """Runs ad-blocker then HTTPS upgrade through a single profile slot."""
 
-    def __init__(self, ad_blocker: AdBlockInterceptor, https: HttpsUpgradeInterceptor) -> None:
+    def __init__(
+        self,
+        ad_blocker: AdBlockInterceptor,
+        https: HttpsUpgradeInterceptor,
+        observers: list[QWebEngineUrlRequestInterceptor] | None = None,
+    ) -> None:
         super().__init__()
         self._ad = ad_blocker
         self._https = https
+        self._observers = list(observers or [])
 
     def interceptRequest(self, info: QWebEngineUrlRequestInfo) -> None:  # noqa: N802
+        for observer in self._observers:
+            observer.interceptRequest(info)
         self._ad.interceptRequest(info)
         self._https.interceptRequest(info)
 
@@ -39,12 +47,18 @@ class _ChainedInterceptor(QWebEngineUrlRequestInterceptor):
 class PrivacyService:
     """Owns all F3 privacy objects and wires them to a QWebEngineProfile."""
 
-    def __init__(self, profile: QWebEngineProfile) -> None:
+    def __init__(
+        self,
+        profile: QWebEngineProfile,
+        request_observers: list[QWebEngineUrlRequestInterceptor] | None = None,
+    ) -> None:
         self.ad_blocker = AdBlockInterceptor()
         self.https_interceptor = HttpsUpgradeInterceptor()
         self.extension_runtime = ExtensionRuntime(profile=profile)
 
-        self._interceptor = _ChainedInterceptor(self.ad_blocker, self.https_interceptor)
+        self._interceptor = _ChainedInterceptor(
+            self.ad_blocker, self.https_interceptor, request_observers
+        )
         profile.setUrlRequestInterceptor(self._interceptor)
 
         self.extension_runtime.load_all()

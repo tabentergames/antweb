@@ -84,7 +84,7 @@ Kullanici geri bildirimiyle acildi (2026-07-07): sag panel/toolbar/ayarlar sadel
 | --- | --- | --- |
 | done | Snippet kutuphanesi | `features/devtools/` altinda profil bazli SQLite store + ayrik kutuphane penceresi; JS/CSS ekle/listele/sil ve yalnizca acik kullanici eylemiyle aktif sekmede calistir. |
 | done | User-agent gecisi | Profil bazli varsayilan/mobil/ozel mod; tercih `data/devtools-<profil>.db` icinde kalici, profil kurulumunda `setHttpUserAgent` ile uygulanir. |
-| todo | Network/request capture | MVP icin URL/interceptor log paneli. |
+| done | Network/request capture | Varsayilan kapali, oturum ici 500 kayitla sinirli URL/metot/resource type paneli; filtreleme, temizleme ve baslat/durdur eylemleri. `PrivacyService` interceptor zincirine generic observer olarak eklenir. |
 | done | DevTools entegrasyonu | `features/devtools/` altinda tek, ayrik ve yeniden boyutlandirilabilir Chromium DevTools penceresi; aktif sekmeye `setDevToolsPage` ile baglanir, menu/sag tik/Ctrl+Alt+I erisimi vardir. |
 
 ## F7 - Power UX (Opera-benzeri yetenekler)
