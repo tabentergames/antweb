@@ -31,6 +31,9 @@ class SnippetStore:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.path = DATA_DIR / f"devtools-{_safe_profile(profile)}.db"
         self._conn = sqlite3.connect(self.path)
+        self._ensure_schema()
+
+    def _ensure_schema(self) -> None:
         self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS snippets (
@@ -43,6 +46,40 @@ class SnippetStore:
             )
             """
         )
+        columns = {
+            str(row[1])
+            for row in self._conn.execute("PRAGMA table_info(snippets)").fetchall()
+        }
+        if {"title", "kind"}.issubset(columns):
+            # The first local F6 implementation used title/kind. Preserve its
+            # rows while aligning the schema with the modular snippet library.
+            self._conn.execute("ALTER TABLE snippets RENAME TO snippets_legacy")
+            self._conn.execute(
+                """
+                CREATE TABLE snippets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    language TEXT NOT NULL,
+                    code TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL
+                )
+                """
+            )
+            self._conn.execute(
+                """
+                INSERT INTO snippets (id, name, language, code, created_at, updated_at)
+                SELECT
+                    id,
+                    title,
+                    CASE LOWER(kind) WHEN 'css' THEN 'css' ELSE 'javascript' END,
+                    code,
+                    created_at,
+                    updated_at
+                FROM snippets_legacy
+                """
+            )
+            self._conn.execute("DROP TABLE snippets_legacy")
         self._conn.commit()
 
     def add(self, name: str, language: str, code: str) -> int | None:

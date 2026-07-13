@@ -51,6 +51,13 @@ Bu sürümde F2 için ilk görsel kabuk eklendi:
 - Native koyu macOS input modalları yerine açık temalı TabX dialogları kullanılır
 - Harf etiketleri yerine ikon/sembol tabanlı kontroller tercih edilir
 - Yeni sekme dashboard'u, hızlı erişim kartları ve hafif Web Haritası önizlemesi
+- `Ctrl/Cmd+K` komut paleti; sekme, gezinme, görünüm, üretkenlik ve geliştirici araçlarına arayarak erişim
+- Bölünmüş görünüm; aktif sayfayı aynı profilde ikinci bir web görünümüyle yan yana açma
+- Video küçük pencere (Picture-in-Picture), profil bazlı eklenip düzenlenebilen web panelleri ve sağ tuş fare hareketleri
+- Web paneli sol kenarından sürüklenerek 300-760 px arasında yeniden boyutlandırılabilir; genişlik profil tercihine kaydedilir
+- `tabx://audit` ile iç sayfaları ve tarayıcı kabuğu yüzeylerini denetleme, her yüzey için profile bağlı tespit notu ekleme
+- Yeni sekmede profil bazlı düzenlenebilir hızlı erişim kartları; aynı site bağlamındaki sekmeler için sekme adaları
+- Görünür alanı PNG olarak kaydetme/panoya kopyalama ve tam sayfayı PDF olarak dışa aktarma
 - RAM tüketimini sınırlamak için fan sekme modu ve ek WebEngine görünümleri şimdilik eklenmedi; F2 kriteri esnek sekme konumu ile kapatıldı
 
 > Not: Fan sekme modu sonraki görsel iterasyona bırakıldı; F2 bu sürümde tema motoru + esnek sekme konumu ile tamamlandı.
@@ -123,12 +130,12 @@ Mevcut tarayıcılardan en iyi özellikleri alıp bunlara yenilerini ekleyerek o
 
 ### 🛠️ Geliştirici Araçları
 
-- **Chromium DevTools** — Aktif sekme için ayrık, taşınabilir pencere; `Ctrl+Alt+I`, sağ tık “İncele” veya `⋯` menüsünden açılır
+- **Chromium DevTools** — Aktif sekmenin yanında açılan, yeniden boyutlandırılabilir sağ dock; `Ctrl+Alt+I`, sağ tık “İncele” veya `⋯` menüsünden açılır
 - **Terminal entegrasyonu** — Tarayıcı içinden doğrudan terminal erişimi
 - **Kodlama modu** — Yerleşik kod editörü, tarayıcıyla yan yana çalışma
 - **Local sunucu (PHP + MySQL)** — XAMPP benzeri, tarayıcı içi local geliştirme ortamı
 - **İstek yakalama** — Profilin interceptor zincirinden beslenen, oturumluk ve 500 kayıtla sınırlı URL/metot/kaynak türü günlüğü
-- **Profil bazlı user-agent** — QtWebEngine varsayılanı, dinamik mobil UA veya özel değer; profil bazında kalıcı
+- **Profil bazlı user-agent** — QtWebEngine işareti içermeyen Chrome uyumlu varsayılan, dinamik mobil UA veya özel değer; profil bazında kalıcı
 - **Snippet kütüphanesi** — Profil bazlı JS/CSS snippet'lerini kaydet, önizle ve açık kullanıcı eylemiyle aktif sekmede çalıştır
 
 ---

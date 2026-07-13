@@ -4,6 +4,47 @@ Son guncelleme: 2026-07-13
 
 ## Son kararlar
 
+- **F7 yeniden acildi — tasarimsal donum noktasi:** Teknik Power UX modulleri
+  teslim edilmis olsa da kullanici F7'nin urunun ozellestirilebilirlik ve UI
+  standardini belirlemesini istiyor. Bu nedenle `tabx://settings` icindeki
+  daginik kartlar final kabul yuzeyi degil. F7 kapanis kriteri; toolbar,
+  panel, gorunur modul, baslangic ekrani ve erisim eylemlerinin aktif profil
+  icin tek bir gorsel duzenleme deneyiminden yonetilmesi olarak guncellendi.
+
+- **F7 UI denetim yuzeyi (2026-07-13):** `tabx://audit`, sol paneldeki
+  "UI denetimi" satirindan, toolbar `...` menusunden ve komut paletinden
+  acilir. Ic sayfalari yeni sekmede acar; kabuk yuzeylerini gorunur yapar.
+  "Tespit ekle" notlari aktif profilin Notlar deposunda `UI denetimi:`
+  basligiyla saklanir. Bu, ozellestirme merkezinin tasarim kabulune girdi
+  toplamak icin gecici kontrol yuzeyidir.
+
+- **F7 Power UX tamamlandi (2026-07-13):** Split view, Picture-in-Picture,
+  lazy GitHub/WhatsApp web panelleri, sag tus fare hareketleri, Ctrl/Cmd+K
+  komut paleti, gorunur alan PNG/pano ve tam sayfa PDF yakalama teslim edildi.
+  `tabx://settings` altindaki Power UX karti bu modulleri aktif profil icin
+  kalici olarak yonetir. Yeni sekme hizli erisim kartlari profil bazli
+  eklenip kaldirilir; ayni hosttaki ardil sekmeler `TabWidget` tarafindan
+  ada gorunumuyle ayrilir. Smoke test bu state, gesture, panel, PiP bos
+  sayfa ve PDF cikti yollarini kapsar. Gercek masaustu testinde video olan
+  bir sayfada Chromium PiP'in platform pencere davranisi manuel bakilmalidir;
+  reddedilirse same-profile always-on-top yedek pencere acilir.
+- **F7 web panel duzenleme + boyut (2026-07-13):** Sol paneldeki "Web
+  panelleri" satirlari artik profil bazli state'tir: `+` ekler, hover
+  eylemleri ad/URL duzenler veya siler. Sag overlay panelinin solundaki drag
+  handle genisligi 300-760 px araliginda degistirir; `web_panels_by_profile`
+  icinde listeyle birlikte kalici yazilir. Profil gecisinde eski profile
+  bagli gizli webview atilir ve yeni profil listesi render edilir.
+
+- **F7 komut paleti tamamlandi (2026-07-13):**
+  `features/power_ux/command_palette.py` mevcut sekme, gezinme, gorunum,
+  uretkenlik ve gelistirici eylemlerini `Ctrl/Cmd+K` ile arama yuzeyinde
+  toplar. Klavye ile secim/Enter, ESC ve dis tiklama desteklenir; overlay
+  tema, profil ve kabuk gecislerinde kapanir. Sonraki F7 dilimi olarak split
+  view veya sidebar web panelleri adaydir.
+- **Yeni sekme dark mode + Web Haritasi drag korundu (2026-07-13):**
+  `_new_tab_html` `Theme` tokenlariyla uretilir; dark modda sabit acik zemin
+  kalmaz. Web Haritasi dugumleri pointer ile suruklenir, baglanti cizgileri
+  canli guncellenir ve konumlar tarayici `localStorage`inda saklanir.
 - **F6 network/request capture tamamlandi; F6 FAZI KAPANDI (2026-07-13):**
   `features/devtools/request_capture.py` varsayilan kapali bir
   `QWebEngineUrlRequestInterceptor` observer'i, oturum ici 500 kayitlik log ve
@@ -19,8 +60,9 @@ Son guncelleme: 2026-07-13
   `developer_settings` tablosuyla `default`/`mobile`/`custom` modlarini saklar.
   Controller `_setup_web_profile` icinde kurulur ve secimi tek noktadan
   `QWebEngineProfile.setHttpUserAgent` ile uygular; profil degisiminde store
-  kapanip hedef profil tercihi yuklenir. Default modu `None` vererek gercek
-  QtWebEngine UA'sina doner. Mobil UA'nin Chrome surumu sabit degil, profil
+  kapanip hedef profil tercihi yuklenir. Default modu QtWebEngine urun
+  isaretini kaldirip mevcut Chromium surumunu koruyan Chrome uyumlu UA kullanir.
+  Mobil UA'nin Chrome surumu sabit degil, profil
   varsayilan UA'sindan regex ile turetilir. Ozel mod bos degeri reddeder.
   Token tabanli modal `⋯ > User-agent` yolundadir; otomatik reload yapmaz,
   kullaniciya acik sayfayi yenilemesini soyler. Smoke test mobil/ozel/default
@@ -36,17 +78,16 @@ Son guncelleme: 2026-07-13
   runner'a verir. Profil gecisinde controller/store kapanip hedef profil icin
   yeniden kurulur; tema degisiminde pencere kapanir ama store korunur. Smoke
   test store, JS/CSS runner ve pencere yeniden kullanimini dogrular.
-- **F6 DevTools entegrasyonu tamamlandi (2026-07-13):**
-  `features/devtools/window.py` cekirdekten ayri `DevToolsWindow` ve
-  `DevToolsController` saglar. Tek DevTools penceresi aktif sayfanin profiliyle
-  olusturulan `QWebEnginePage`e baglanir; ayni hedefte tekrar acilis pencereyi
-  one getirir. Kapanista `setDevToolsPage(None)` ile ayrilir. Hedef sekme,
-  workspace/profil, tema kabugu veya uygulama kapanirken controller da kapanir;
-  `destroyed` baglantisi lambda degil QObject slot'udur (silinmis PyQt wrapper
-  cagrisini onler). Erisim: toolbar `⋯`, her sayfadaki context menu "Incele"
-  ve `Ctrl+Alt+I`. Chromium DevTools frontend'i kendi stilini yonetir; TabX
-  QSS/webview efekti uygulanmaz. Smoke test baglanma, yeniden kullanim ve
-  ayrilmayi dogrular.
+- **F6 DevTools sag dock'a tasindi (2026-07-13):**
+  `features/devtools/window.py` cekirdekten ayri `DevToolsDock` ve
+  `DevToolsController` saglar. Chromium frontend'i aktif sayfanin yaninda,
+  `QSplitter` icindeki yeniden boyutlandirilabilir sag dock'ta gorunur; ayni
+  hedefte tekrar acilis ayni dock'u kullanir. Kapanista `setDevToolsPage(None)`
+  ile ayrilir. Hedef sekme, workspace/profil, tema kabugu veya uygulama
+  kapanirken guvenli bicimde ayrilir. Erisim: toolbar `⋯`, her sayfadaki
+  context menu "Incele" ve `Ctrl+Alt+I`. Chromium DevTools frontend'i kendi
+  stilini yonetir; TabX QSS/webview efekti uygulanmaz. Smoke test baglanma,
+  yeniden kullanim ve ayrilmayi dogrular.
 - **F5 web clipper tamamlandi; F5 FAZI KAPANDI (2026-07-13):**
   Secili metin varsa `BrowserTab._build_context_menu` "Nota kaydet" eylemini
   gosterir. `BrowserWindow.clip_to_note` secimi, sayfa basligini ve kaynak

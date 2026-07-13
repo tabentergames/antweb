@@ -105,7 +105,7 @@ class UserAgentDialog(QDialog):
         layout.addWidget(description)
 
         self.mode_input = QComboBox()
-        self.mode_input.addItem("QtWebEngine varsayılanı", "default")
+        self.mode_input.addItem("Chrome uyumlu varsayılan", "default")
         self.mode_input.addItem("Mobil tarayıcı", "mobile")
         self.mode_input.addItem("Özel değer", "custom")
         index = max(0, self.mode_input.findData(mode))
@@ -224,7 +224,9 @@ class UserAgentController:
 
     def apply(self) -> str:
         if self.mode == "default":
-            self._profile.setHttpUserAgent(None)
+            self._profile.setHttpUserAgent(
+                self.chrome_compatible_user_agent(self._default_user_agent)
+            )
         elif self.mode == "mobile":
             self._profile.setHttpUserAgent(
                 self.mobile_user_agent(self._default_user_agent)
@@ -235,6 +237,15 @@ class UserAgentController:
 
     def close(self) -> None:
         self.store.close()
+
+    @staticmethod
+    def chrome_compatible_user_agent(default_user_agent: str) -> str:
+        """Drops Qt's product token while retaining the bundled Chromium version.
+
+        Some web applications block QtWebEngine despite its Chromium engine when
+        the product token appears in the user-agent string.
+        """
+        return re.sub(r"\bQtWebEngine/[^\s]+\s*", "", default_user_agent).strip()
 
     @staticmethod
     def mobile_user_agent(default_user_agent: str) -> str:

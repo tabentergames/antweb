@@ -1,104 +1,166 @@
-"""QtWebEngine DevTools window and lifecycle controller."""
+"""Docked QtWebEngine DevTools surface and lifecycle controller."""
 
 from __future__ import annotations
 
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtWebEngineCore import QWebEnginePage
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWidgets import QMainWindow, QWidget
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+
+from ui.theme import Theme
 
 
-class DevToolsWindow(QMainWindow):
-    """Ayrik ve yeniden boyutlandirilabilir Chromium DevTools penceresi."""
+class DevToolsDock(QFrame):
+    """Resizable right-side Chromium DevTools frontend for one inspected page."""
 
     closed = pyqtSignal()
 
-    def __init__(
-        self, target_page: QWebEnginePage, parent: QWidget | None = None
-    ) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
-        self.setWindowTitle("TabX Geliştirici Araçları")
-        self.resize(1100, 720)
+        self._target_page: QWebEnginePage | None = None
+        self._devtools_page: QWebEnginePage | None = None
+        self.setObjectName("devToolsDock")
+        self.setMinimumWidth(360)
+        self.setStyleSheet(
+            f"""
+            QFrame#devToolsDock {{
+                background-color: {Theme.panel};
+                border-left: 1px solid {Theme.border_soft};
+            }}
+            QFrame#devToolsHeader {{
+                background-color: {Theme.toolbar};
+                border-bottom: 1px solid {Theme.border_soft};
+            }}
+            """
+        )
 
-        self._target_page: QWebEnginePage | None = target_page
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        header = QFrame()
+        header.setObjectName("devToolsHeader")
+        header.setFixedHeight(38)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(Theme.SPACE_MD, 0, Theme.SPACE_SM, 0)
+        title = QLabel("Geliştirici araçları")
+        title.setStyleSheet(f"font-size: 12px; font-weight: 800; color: {Theme.text};")
+        header_layout.addWidget(title)
+        header_layout.addStretch(1)
+        close = QPushButton("×")
+        close.setToolTip("Geliştirici araçlarını kapat")
+        close.setFixedSize(28, 28)
+        close.setStyleSheet(
+            f"""
+            QPushButton {{ border: none; border-radius: {Theme.RADIUS_SM}px; color: {Theme.muted}; background: transparent; font-size: 18px; }}
+            QPushButton:hover {{ background-color: {Theme.button_hover}; color: {Theme.text}; }}
+            """
+        )
+        close.clicked.connect(self.close_panel)
+        header_layout.addWidget(close)
+        layout.addWidget(header)
+
         self.view = QWebEngineView(self)
-        self.setCentralWidget(self.view)
-        self._devtools_page = QWebEnginePage(target_page.profile(), self.view)
-        self.view.setPage(self._devtools_page)
-        target_page.setDevToolsPage(self._devtools_page)
-        target_page.destroyed.connect(self._on_target_destroyed)
+        layout.addWidget(self.view, 1)
+        self.hide()
 
     @property
     def target_page(self) -> QWebEnginePage | None:
         return self._target_page
 
-    def detach(self) -> None:
-        """Hedef sayfayi DevTools frontend'inden guvenli bicimde ayirir."""
-        target_page = self._target_page
-        self._target_page = None
-        if target_page is None:
+    def inspect(self, target_page: QWebEnginePage) -> None:
+        """Attach the dock's frontend to the requested browser page."""
+        if self._target_page is target_page and self._devtools_page is not None:
+            self.show()
             return
-        try:
-            if target_page.devToolsPage() is self._devtools_page:
-                target_page.setDevToolsPage(None)
-        except RuntimeError:
-            pass
-
-    def closeEvent(self, event) -> None:  # noqa: N802
         self.detach()
-        self.closed.emit()
-        super().closeEvent(event)
+        self._target_page = target_page
+        self._devtools_page = QWebEnginePage(target_page.profile(), self.view)
+        self.view.setPage(self._devtools_page)
+        target_page.setDevToolsPage(self._devtools_page)
+        target_page.destroyed.connect(self._on_target_destroyed)
+        self.show()
+
+    def detach(self) -> None:
+        """Detach the Chromium frontend without destroying the inspected tab."""
+        target_page = self._target_page
+        devtools_page = self._devtools_page
+        self._target_page = None
+        self._devtools_page = None
+        if target_page is not None:
+            try:
+                if target_page.devToolsPage() is devtools_page:
+                    target_page.setDevToolsPage(None)
+            except RuntimeError:
+                pass
+        if devtools_page is not None:
+            devtools_page.deleteLater()
+
+    def close_panel(self) -> None:
+        was_open = self._target_page is not None or self.isVisible()
+        self.detach()
+        self.hide()
+        if was_open:
+            self.closed.emit()
 
     def _on_target_destroyed(self, _object=None) -> None:
         self._target_page = None
-        self.close()
+        self._devtools_page = None
+        self.hide()
+        self.closed.emit()
 
 
 class DevToolsController(QObject):
-    """Tek DevTools penceresini aktif sekmeye baglayan oturum yoneticisi."""
+    """One docked DevTools frontend, attached to the selected browser tab."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._host = parent
-        self._window: DevToolsWindow | None = None
+        self._dock: DevToolsDock | None = None
 
     @property
-    def window(self) -> DevToolsWindow | None:
-        return self._window
+    def dock(self) -> DevToolsDock | None:
+        return self._dock
+
+    @property
+    def window(self) -> DevToolsDock | None:
+        """Compatibility alias for callers that previously used `window`."""
+        return self._dock
+
+    def create_dock(self, parent: QWidget) -> DevToolsDock:
+        if self._dock is None:
+            self._dock = DevToolsDock(parent)
+            self._dock.closed.connect(self._clear_dock)
+        return self._dock
 
     def is_open(self) -> bool:
-        return self._window is not None and self._window.isVisible()
+        return self._dock is not None and self._dock.isVisible()
 
-    def open_for(self, target_page: QWebEnginePage) -> DevToolsWindow:
-        """DevTools'u hedef sayfa icin acar veya mevcut pencereyi one getirir."""
-        if self._window is not None and self._window.target_page is target_page:
-            self._window.show()
-            self._window.raise_()
-            self._window.activateWindow()
-            return self._window
-
-        self.close()
-        window = DevToolsWindow(target_page, self._host)
-        window.closed.connect(lambda current=window: self._clear_window(current))
-        self._window = window
-        window.show()
-        window.raise_()
-        window.activateWindow()
-        return window
+    def open_for(self, target_page: QWebEnginePage) -> DevToolsDock:
+        if self._dock is None:
+            raise RuntimeError("DevTools dock must be created before it is opened")
+        self._dock.inspect(target_page)
+        return self._dock
 
     def detach_from(self, target_page: QWebEnginePage) -> None:
-        """Yalnizca belirtilen sayfa inceleniyorsa pencereyi kapatir."""
-        if self._window is not None and self._window.target_page is target_page:
+        if self._dock is not None and self._dock.target_page is target_page:
             self.close()
 
     def close(self) -> None:
-        window = self._window
-        if window is None:
-            return
-        self._window = None
-        window.close()
+        if self._dock is not None:
+            self._dock.close_panel()
 
-    def _clear_window(self, window: DevToolsWindow) -> None:
-        if self._window is window:
-            self._window = None
+    def dispose_dock(self) -> None:
+        """Release a dock before its containing visual shell is replaced."""
+        dock = self._dock
+        if dock is None:
+            return
+        self._dock = None
+        dock.close_panel()
+        dock.setParent(None)
+        dock.deleteLater()
+
+    def _clear_dock(self) -> None:
+        # The dock remains in the splitter and can be reused for the next tab.
+        pass
+
+
+DevToolsWindow = DevToolsDock

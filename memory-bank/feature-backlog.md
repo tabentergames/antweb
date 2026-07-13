@@ -85,7 +85,7 @@ Kullanici geri bildirimiyle acildi (2026-07-07): sag panel/toolbar/ayarlar sadel
 | done | Snippet kutuphanesi | `features/devtools/` altinda profil bazli SQLite store + ayrik kutuphane penceresi; JS/CSS ekle/listele/sil ve yalnizca acik kullanici eylemiyle aktif sekmede calistir. |
 | done | User-agent gecisi | Profil bazli varsayilan/mobil/ozel mod; tercih `data/devtools-<profil>.db` icinde kalici, profil kurulumunda `setHttpUserAgent` ile uygulanir. |
 | done | Network/request capture | Varsayilan kapali, oturum ici 500 kayitla sinirli URL/metot/resource type paneli; filtreleme, temizleme ve baslat/durdur eylemleri. `PrivacyService` interceptor zincirine generic observer olarak eklenir. |
-| done | DevTools entegrasyonu | `features/devtools/` altinda tek, ayrik ve yeniden boyutlandirilabilir Chromium DevTools penceresi; aktif sekmeye `setDevToolsPage` ile baglanir, menu/sag tik/Ctrl+Alt+I erisimi vardir. |
+| done | DevTools entegrasyonu | `features/devtools/` altinda tek, yeniden boyutlandirilabilir sag dock; aktif sekmeye `setDevToolsPage` ile baglanir, menu/sag tik/Ctrl+Alt+I erisimi vardir. |
 
 ## F7 - Power UX (Opera-benzeri yetenekler)
 
@@ -94,14 +94,15 @@ Her biri kapatilabilir modul olarak `features/` altina gider; cekirdege gomulmez
 | Durum | Is | Not |
 | --- | --- | --- |
 | done | Scroll auto-hide browser chrome | Asagi scroll'da tab strip + toolbar yuksekligi animasyonla 0'a iner; yukari scroll veya ust kenar hotspot hover'i geri acar. Webview'e efekt uygulanmaz. |
-| todo | Split view | Iki sekmeyi yan yana gosterme; QSplitter + snapshot gecis animasyonu. |
-| todo | Video pop-out | Videoyu her zaman ustte kucuk pencereye alma (picture-in-picture). |
-| todo | Sidebar web panelleri | Opera tarzi: sol rail'e sabitlenen dar webview panelleri (WhatsApp/Telegram vb.). |
-| todo | Komut paleti | Ctrl/Cmd+K — sekme/ayar/komut arama; `Theme.glass_strong` overlay. |
-| todo | Mouse gestures | Sag tus + hareketle geri/ileri/kapat; ayarlardan kapatilabilir. |
-| todo | Speed dial genisletme | Yeni sekme dashboard'una duzenlenebilir kisayol kartlari + arka plan. |
-| todo | Sekme adalari (tab islands) | Ayni baglamdaki sekmeleri strip uzerinde gorsel gruplama; F4 workspace ile uyumlu. |
-| todo | Ekran goruntusu araci | Gorunur alan/tam sayfa yakalama + panoya/dosyaya kaydet. |
+| done | Split view | Aktif sayfayi ayni profile bagli ikinci web gorunumuyle gecici yatay splitter icinde yan yana acar; sekme/profil/tema/workspace gecisinde kapanir. |
+| done | Video pop-out | Aktif sayfadaki oynatilabilir video icin Chromium Picture-in-Picture istegi; desteklenmez veya reddedilirse ayni profil ile always-on-top video penceresi yedegi acilir. |
+| done | Sidebar web panelleri | Sol panelde profil bazli ekle/duzenle/sil listesi; secilen sayfa tekrar kullanilan overlay web panelinde acilir. Sol kenar drag handle'i 300-760 px araligindaki genisligi kalici degistirir. |
+| done | Komut paleti | `features/power_ux/command_palette.py`; Ctrl/Cmd+K ile filtreleme, klavye secimi/Enter, ESC ve dis tiklama. Mevcut sekme, gezinme, gorunum, uretkenlik ve gelistirici eylemlerini acar. |
+| done | Mouse gestures | Sag tus + sola/saga/asagi hareket geri/ileri/sekmeyi kapatir; profil bazli Power UX ayarindan kapatilabilir. |
+| in-progress | F7 ozellestirme merkezi ve UI donum noktasi | Teknik moduller calisir; fakat F7 ancak toolbar/panel yerlesimi, gorunur moduller, baslangic yuzeyi ve erisim eylemleri tek bir profil bazli gorsel duzenleme deneyiminde yonetildiginde kapanir. Mevcut `tabx://settings` kartlari ara durumdur. `tabx://audit` bu kabul icin yuzeyleri acip tespit notu toplayan gecici kontrol aracidir. |
+| done | Speed dial genisletme | Yeni sekmede ekle/kaldir kartlari; kisayollar profil bazli `ui_state.json` state'inde saklanir. |
+| done | Sekme adalari (tab islands) | Ayni hosttaki ardil sekmeler strip'te mor baslangic kenari ve ara boslukla gruplanir; workspace sekme setiyle birlikte gorunur. |
+| done | Ekran goruntusu araci | Gorunur alan PNG dosyasi/pano ve tam sayfa PDF disari aktarma toolbar ile komut paletindedir. |
 
 ## Temel tarayici yuzeyleri
 

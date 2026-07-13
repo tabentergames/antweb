@@ -15,13 +15,14 @@ class TabButton(QFrame):
 
     MIN_WIDTH = 144
 
-    def __init__(self, title="Yeni Sekme", active=False, closable=True, icon=None, parent=None):
+    def __init__(self, title="Yeni Sekme", active=False, closable=True, icon=None, island_start=False, parent=None):
         super().__init__(parent)
         self._title = title
         self._active = active
         self._closable = closable
         self._hover = 0.0
         self._icon = None
+        self._island_start = island_start
 
         self.setFixedHeight(34)
         self.setMinimumWidth(self.MIN_WIDTH)
@@ -114,11 +115,13 @@ class TabButton(QFrame):
             self.icon_label.setStyleSheet(
                 f"QLabel {{ background-color: {dot_color}; border-radius: 4px; }}"
             )
+        island_border = Theme.purple if self._island_start else border_color
         self.setStyleSheet(
             f"""
             QFrame {{
                 background-color: {bg_color};
                 border: 1px solid {border_color};
+                border-left: 3px solid {island_border};
                 border-radius: 11px;
             }}
             """
@@ -190,6 +193,7 @@ class TabWidget(QWidget):
         self._buttons = []
         self._appear_index = None
         self._position = position
+        self._islands_enabled = True
 
         self.layout = QHBoxLayout(self)
         self.setObjectName("tabStrip")
@@ -212,6 +216,15 @@ class TabWidget(QWidget):
     def setPosition(self, position):
         self._position = "bottom" if position == "bottom" else "top"
         self.apply_style()
+
+    def set_islands_enabled(self, enabled):
+        self._islands_enabled = bool(enabled)
+        self._render_tabs()
+
+    def setTabUrl(self, index, url):
+        if 0 <= index < len(self._tabs):
+            self._tabs[index]["url"] = url
+            self._render_tabs()
 
     def add_tab(self, url=None, title="Yeni Sekme"):
         self._tabs.append({"url": url or QUrl("tabx://newtab"), "title": title, "icon": None})
@@ -315,12 +328,19 @@ class TabWidget(QWidget):
                 child.widget().deleteLater()
 
         self._buttons = []
+        previous_island = None
         for i, tab_info in enumerate(self._tabs):
+            url = tab_info.get("url")
+            island = url.host().lower() if isinstance(url, QUrl) and url.host() else ""
+            island_start = self._islands_enabled and bool(island) and island != previous_island
+            if island_start and i:
+                self.layout.addSpacing(8)
             tab_button = TabButton(
                 title=tab_info["title"],
                 active=i == self._active_index,
                 closable=True,
                 icon=tab_info.get("icon"),
+                island_start=island_start,
             )
             tab_button.clicked.connect(lambda checked=False, idx=i: self.setCurrentIndex(idx))
             tab_button.closed.connect(lambda checked=False, idx=i: self._request_close(idx))
@@ -328,6 +348,7 @@ class TabWidget(QWidget):
             self._buttons.append(tab_button)
             if i == self._appear_index and Motion.enabled:
                 self._animate_appear(tab_button)
+            previous_island = island
 
         add_btn = QPushButton("+")
         add_btn.setFixedSize(34, 34)
@@ -351,4 +372,3 @@ class TabWidget(QWidget):
         add_btn.clicked.connect(lambda checked=False: self.newTabRequested.emit())
         self.layout.addWidget(add_btn)
         self.layout.addStretch(1)
-

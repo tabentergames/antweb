@@ -9,10 +9,11 @@ from .request_capture import (
 from .snippet_store import Snippet, SnippetStore
 from .snippets import SnippetController, SnippetLibraryWindow
 from .user_agent import UserAgentController, UserAgentDialog, UserAgentStore
-from .window import DevToolsController, DevToolsWindow
+from .window import DevToolsController, DevToolsDock, DevToolsWindow
 
 __all__ = [
     "DevToolsController",
+    "DevToolsDock",
     "DevToolsWindow",
     "RequestCaptureController",
     "RequestCaptureInterceptor",
