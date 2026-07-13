@@ -419,6 +419,43 @@ def run() -> int:
     assert inspected_page.devToolsPage() is None, "DevTools sayfadan ayrilmadi"
     assert not window.devtools.is_open(), "DevTools controller kapanmadi"
 
+    # F6 — profil bazli JS/CSS snippet store + aktif sayfa runner.
+    js_id = window.snippets.store.add(
+        "Smoke JS", "javascript", "window.__tabxSmoke = true;"
+    )
+    css_id = window.snippets.store.add(
+        "Smoke CSS", "css", "body { outline: 1px solid red; }"
+    )
+    assert js_id is not None and css_id is not None, "snippet kaydi olusturulamadi"
+    assert window.snippets.store.get(js_id).language == "javascript", (
+        "JS snippet store'dan okunamadi"
+    )
+
+    class _FakeSnippetPage:
+        def __init__(self):
+            self.scripts = []
+
+        def runJavaScript(self, script):
+            self.scripts.append(script)
+
+    fake_page = _FakeSnippetPage()
+    assert window.snippets.execute(js_id, fake_page), "JS snippet calistirilmadi"
+    assert fake_page.scripts[-1] == "window.__tabxSmoke = true;", (
+        "JS snippet kodu degisti"
+    )
+    assert window.snippets.execute(css_id, fake_page), "CSS snippet calistirilmadi"
+    assert "data-tabx-snippet" in fake_page.scripts[-1], "CSS marker eklenmedi"
+    assert "outline: 1px solid red" in fake_page.scripts[-1], "CSS kodu enjekte edilmedi"
+
+    snippet_window = window.open_snippet_library()
+    assert snippet_window.list.count() >= 2, "snippet kutuphanesi kayitlari gostermiyor"
+    assert window.open_snippet_library() is snippet_window, (
+        "snippet kutuphanesi penceresi tekrar kullanilmadi"
+    )
+    window.snippets.close_window()
+    window.snippets.store.remove(js_id)
+    window.snippets.store.remove(css_id)
+
     # Arama motoru secimi — kalicilik + search_url + adres cubugu fallback'i.
     original_search_engine = window.search_engine
     window.set_search_engine("google")

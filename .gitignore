@@ -26,5 +26,6 @@ data/ui_state.json
 # F4 local data (session, history, bookmarks, profiles)
 data/sessions.json
 data/library-*.db
+data/devtools-*.db
 data/productivity-*.db
 data/profiles/

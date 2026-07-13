@@ -129,7 +129,7 @@ Mevcut tarayıcılardan en iyi özellikleri alıp bunlara yenilerini ekleyerek o
 - **Local sunucu (PHP + MySQL)** — XAMPP benzeri, tarayıcı içi local geliştirme ortamı
 - **İstek yakalama** — Yerleşik ağ proxy ve API mock araçları
 - **Çoklu user-agent** — Masaüstü / mobil / özel user-agent hızlı geçiş
-- **Snippet kütüphanesi** — Sık kullanılan JS/CSS snippet'lerini kaydet ve yönet
+- **Snippet kütüphanesi** — Profil bazlı JS/CSS snippet'lerini kaydet, önizle ve açık kullanıcı eylemiyle aktif sekmede çalıştır
 
 ---
 
@@ -144,7 +144,7 @@ Mevcut tarayıcılardan en iyi özellikleri alıp bunlara yenilerini ekleyerek o
 | **v0.3** — Gizlilik Katmanı        | TabX eklenti sistemi, ad/tracker blocking, HTTPS upgrade, izinler   | ✅ Tamamlandı     |
 | **v0.4** — Profil & Workspace      | Çoklu profil, workspace, oturum kaydetme, sekme grupları            | ✅ Tamamlandı     |
 | **v0.5** — Productivity            | Floating todo, Kanban, yerel notlar ve seçili metin web clipper     | ✅ Tamamlandı     |
-| **v0.6** — Geliştirici Araçları    | DevTools tamamlandı; snippet, user-agent ve istek yakalama sırada   | 🔄 Başladı        |
+| **v0.6** — Geliştirici Araçları    | DevTools + snippet tamamlandı; user-agent ve istek yakalama sırada  | 🔄 Başladı        |
 | **v1.0** — Kararlı Sürüm           | Firma içi pilot tamamlandı, performans optimizasyonu, cross-platform | 🎯 Hedef          |
 | **v2.0** — Bulut & Premium         | Bulut sync, takım workspace'leri, premium özellikler                | 💡 Vizyon         |
 | **Araştırma** — Tam Uzantı Desteği | Chromium fork / CEF değerlendirmesi (yalnızca ölçek gerektirir)     | 🔬 Araştırma      |

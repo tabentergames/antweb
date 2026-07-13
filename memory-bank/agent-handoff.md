@@ -4,6 +4,17 @@ Son guncelleme: 2026-07-13
 
 ## Son kararlar
 
+- **F6 snippet kutuphanesi tamamlandi (2026-07-13):**
+  `features/devtools/snippet_store.py` profil bazli SQLite store, `snippets.py`
+  ise token tabanli `SnippetInputDialog`, ayrik/tasinabilir
+  `SnippetLibraryWindow` ve `SnippetController` saglar. Dil degerleri yalnizca
+  `javascript`/`css`; bos ad veya kod kaydedilmez. JS `runJavaScript` ile
+  dogrudan, CSS JSON-escaped metinle `data-tabx-snippet` isaretli `<style>`
+  dugumune uygulanir; tekrar calistirma ayni dugumu gunceller. Otomatik
+  injection YOKTUR. Cekirdek `runRequested` sinyalinde yalnizca aktif page'i
+  runner'a verir. Profil gecisinde controller/store kapanip hedef profil icin
+  yeniden kurulur; tema degisiminde pencere kapanir ama store korunur. Smoke
+  test store, JS/CSS runner ve pencere yeniden kullanimini dogrular.
 - **F6 DevTools entegrasyonu tamamlandi (2026-07-13):**
   `features/devtools/window.py` cekirdekten ayri `DevToolsWindow` ve
   `DevToolsController` saglar. Tek DevTools penceresi aktif sayfanin profiliyle
@@ -304,10 +315,10 @@ Son guncelleme: 2026-07-13
 ## Bir sonraki agent icin onerilen ilk gorev
 
 "Temel tarayici yuzeyleri", F2.5, F3 ve F5 fazlari KAPANDI. F6 Developer
-Tools basladi ve DevTools penceresi tamamlandi. Siradaki `todo` olan snippet
-kutuphanesi tek dilim halinde ele alinmali: profil bazli local store, kayitli
-JS/CSS snippet listesi ve yalnizca aktif sekmede acik kullanici eylemiyle
-calistirma. User-agent ve request capture bu dilime karistirilmamali.
+Tools basladi; DevTools penceresi ve snippet kutuphanesi tamamlandi. Siradaki
+`todo` user-agent gecisidir. Ilk dilim profil bazli veya sekme bazli secimden
+birini netlestirip kucuk tutulmali; request capture ayni degisiklige
+karistirilmamali.
 
 Kullanici F7 isterse komut paleti iyi ilk adaydir:
 FanOverlay'in scrim+glass+ESC/dis-tiklama deseni, `_setup_shortcuts`
@@ -317,8 +328,9 @@ Net teslim kriteri:
 
 - F7 komut paleti secilirse `FanOverlay` scrim/glass/ESC desenini kullan;
   komutlar sekme/ayar/ic sayfa acma gibi mevcut calisan yuzeylerle sinirli kalsin.
-- F6 snippet diliminde veri/UI `features/devtools/` altinda kalmali; cekirdek
-  yalnizca aktif sayfayi calistiriciya vermeli.
+- F6 user-agent diliminde ayar/uygulama mantigi `features/devtools/` altinda
+  kalmali; profil degisimi ve yeni sekme olusumu icin tek entegrasyon noktasi
+  kullanilmali.
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
 
 Birikmis kucuk iyilestirmeler (istenirse ayri dilimler): kalici indirme

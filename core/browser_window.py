@@ -29,7 +29,7 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 # F3 privacy layer
 from features.privacy.service import PrivacyService
 from features.downloads.manager import DownloadManager
-from features.devtools import DevToolsController
+from features.devtools import DevToolsController, SnippetController
 from features.library.store import BookmarkStore, HistoryStore
 from features.productivity.kanban_store import KanbanStore
 from features.productivity.notes_store import NotesStore
@@ -825,6 +825,8 @@ class BrowserWindow(QMainWindow):
         self.todos = TodoStore(self.profile_name)
         self.kanban = KanbanStore(self.profile_name)
         self.notes = NotesStore(self.profile_name)
+        self.snippets = SnippetController(self.profile_name, self)
+        self.snippets.runRequested.connect(self.run_snippet)
         self.workspace = SessionStore.active_workspace(self.profile_name)
 
     def _restore_session(self):
@@ -862,6 +864,7 @@ class BrowserWindow(QMainWindow):
         from PyQt6 import sip
 
         self.devtools.close()
+        self.snippets.close()
         self.current_view = None
         self.todos.close()
         self.kanban.close()
@@ -1132,6 +1135,7 @@ class BrowserWindow(QMainWindow):
         more_menu.addAction("✎  Notlar", lambda: self.open_internal_page("notes"))
         more_menu.addSeparator()
         more_menu.addAction("⌁  Geliştirici araçları", self.open_devtools)
+        more_menu.addAction("⌘  Snippet kütüphanesi", self.open_snippet_library)
         more_menu.addAction("⚙  Ayarlar", lambda: self.open_internal_page("settings"))
         more_menu.addAction("?  Hakkında", lambda: self.open_internal_page("about"))
         more_btn.setMenu(more_menu)
@@ -1734,6 +1738,7 @@ class BrowserWindow(QMainWindow):
         self.todos.close()
         self.kanban.close()
         self.notes.close()
+        self.snippets.close()
         # Eski profil nesnesi acik sayfalar yok edilene kadar yasamali.
         self._retired_profiles.append(self.web_profile)
 
@@ -1871,6 +1876,7 @@ class BrowserWindow(QMainWindow):
     def _rebuild_visual_shell(self):
         # Acik sekmeler kaybolmasin: oturumu kaydet, kabugu kur, geri yukle.
         self.devtools.close()
+        self.snippets.close_window()
         if self._fan_overlay is not None:
             self._fan_overlay.dismiss()
         self.browser_chrome_hidden = False
@@ -2501,6 +2507,15 @@ class BrowserWindow(QMainWindow):
         if self.current_view is None:
             return None
         return self.devtools.open_for(self.current_view.page())
+
+    def open_snippet_library(self):
+        """Aktif profil icin snippet kutuphanesini acar."""
+        return self.snippets.open()
+
+    def run_snippet(self, snippet_id: int) -> bool:
+        """Snippet runner'a yalnizca aktif sayfayi aktarir."""
+        page = self.current_view.page() if self.current_view is not None else None
+        return self.snippets.execute(snippet_id, page)
 
     # ------------------------------------------------------------------
     # Klavye kisayollari

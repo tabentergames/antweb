@@ -82,7 +82,7 @@ Kullanici geri bildirimiyle acildi (2026-07-07): sag panel/toolbar/ayarlar sadel
 
 | Durum | Is | Not |
 | --- | --- | --- |
-| todo | Snippet kutuphanesi | JS/CSS snippet kaydet, secili sekmede calistir. |
+| done | Snippet kutuphanesi | `features/devtools/` altinda profil bazli SQLite store + ayrik kutuphane penceresi; JS/CSS ekle/listele/sil ve yalnizca acik kullanici eylemiyle aktif sekmede calistir. |
 | todo | User-agent gecisi | Sekme veya profil bazli. |
 | todo | Network/request capture | MVP icin URL/interceptor log paneli. |
 | done | DevTools entegrasyonu | `features/devtools/` altinda tek, ayrik ve yeniden boyutlandirilabilir Chromium DevTools penceresi; aktif sekmeye `setDevToolsPage` ile baglanir, menu/sag tik/Ctrl+Alt+I erisimi vardir. |
