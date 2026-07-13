@@ -83,7 +83,7 @@ Kullanici geri bildirimiyle acildi (2026-07-07): sag panel/toolbar/ayarlar sadel
 | Durum | Is | Not |
 | --- | --- | --- |
 | done | Snippet kutuphanesi | `features/devtools/` altinda profil bazli SQLite store + ayrik kutuphane penceresi; JS/CSS ekle/listele/sil ve yalnizca acik kullanici eylemiyle aktif sekmede calistir. |
-| todo | User-agent gecisi | Sekme veya profil bazli. |
+| done | User-agent gecisi | Profil bazli varsayilan/mobil/ozel mod; tercih `data/devtools-<profil>.db` icinde kalici, profil kurulumunda `setHttpUserAgent` ile uygulanir. |
 | todo | Network/request capture | MVP icin URL/interceptor log paneli. |
 | done | DevTools entegrasyonu | `features/devtools/` altinda tek, ayrik ve yeniden boyutlandirilabilir Chromium DevTools penceresi; aktif sekmeye `setDevToolsPage` ile baglanir, menu/sag tik/Ctrl+Alt+I erisimi vardir. |
 

@@ -456,6 +456,22 @@ def run() -> int:
     window.snippets.store.remove(js_id)
     window.snippets.store.remove(css_id)
 
+    # F6 — profil bazli user-agent modu kalicidir ve profile uygulanir.
+    original_ua_mode = window.user_agent.mode
+    original_custom_ua = window.user_agent.custom_user_agent
+    default_ua = window.user_agent._default_user_agent
+    window.user_agent.set_mode("mobile")
+    assert "Android" in window.web_profile.httpUserAgent(), "mobil UA uygulanmadi"
+    assert "Mobile" in window.web_profile.httpUserAgent(), "mobil UA etiketi yok"
+    assert window.user_agent.store.load()[0] == "mobile", "mobil UA kalici degil"
+    window.user_agent.set_mode("custom", "TabX-Smoke/1.0")
+    assert window.web_profile.httpUserAgent() == "TabX-Smoke/1.0", (
+        "ozel UA profile uygulanmadi"
+    )
+    window.user_agent.set_mode("default")
+    assert window.web_profile.httpUserAgent() == default_ua, "varsayilan UA geri donmedi"
+    window.user_agent.set_mode(original_ua_mode, original_custom_ua)
+
     # Arama motoru secimi — kalicilik + search_url + adres cubugu fallback'i.
     original_search_engine = window.search_engine
     window.set_search_engine("google")

@@ -4,6 +4,17 @@ Son guncelleme: 2026-07-13
 
 ## Son kararlar
 
+- **F6 profil bazli user-agent gecisi tamamlandi (2026-07-13):**
+  `features/devtools/user_agent.py` ayni `data/devtools-<profil>.db` icinde
+  `developer_settings` tablosuyla `default`/`mobile`/`custom` modlarini saklar.
+  Controller `_setup_web_profile` icinde kurulur ve secimi tek noktadan
+  `QWebEngineProfile.setHttpUserAgent` ile uygular; profil degisiminde store
+  kapanip hedef profil tercihi yuklenir. Default modu `None` vererek gercek
+  QtWebEngine UA'sina doner. Mobil UA'nin Chrome surumu sabit degil, profil
+  varsayilan UA'sindan regex ile turetilir. Ozel mod bos degeri reddeder.
+  Token tabanli modal `⋯ > User-agent` yolundadir; otomatik reload yapmaz,
+  kullaniciya acik sayfayi yenilemesini soyler. Smoke test mobil/ozel/default
+  yollarini ve kaliciligi dogrulayip baslangic tercihini geri yukler.
 - **F6 snippet kutuphanesi tamamlandi (2026-07-13):**
   `features/devtools/snippet_store.py` profil bazli SQLite store, `snippets.py`
   ise token tabanli `SnippetInputDialog`, ayrik/tasinabilir
@@ -315,10 +326,10 @@ Son guncelleme: 2026-07-13
 ## Bir sonraki agent icin onerilen ilk gorev
 
 "Temel tarayici yuzeyleri", F2.5, F3 ve F5 fazlari KAPANDI. F6 Developer
-Tools basladi; DevTools penceresi ve snippet kutuphanesi tamamlandi. Siradaki
-`todo` user-agent gecisidir. Ilk dilim profil bazli veya sekme bazli secimden
-birini netlestirip kucuk tutulmali; request capture ayni degisiklige
-karistirilmamali.
+Tools basladi; DevTools penceresi, snippet kutuphanesi ve profil bazli
+user-agent gecisi tamamlandi. F6'yi kapatacak son `todo` request capture'dir:
+varsayilan kapali, oturum ici sinirli log, URL/metot/resource type gorunumu ve
+temizleme/baslat-durdur eylemleriyle kucuk tutulmali.
 
 Kullanici F7 isterse komut paleti iyi ilk adaydir:
 FanOverlay'in scrim+glass+ESC/dis-tiklama deseni, `_setup_shortcuts`
@@ -328,9 +339,9 @@ Net teslim kriteri:
 
 - F7 komut paleti secilirse `FanOverlay` scrim/glass/ESC desenini kullan;
   komutlar sekme/ayar/ic sayfa acma gibi mevcut calisan yuzeylerle sinirli kalsin.
-- F6 user-agent diliminde ayar/uygulama mantigi `features/devtools/` altinda
-  kalmali; profil degisimi ve yeni sekme olusumu icin tek entegrasyon noktasi
-  kullanilmali.
+- F6 request capture, mevcut tek profil interceptor slotunu bozmadan
+  `PrivacyService` zincirine generic observer olarak eklenmeli; F6 modulu
+  privacy implementasyonuna gomulmemeli.
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
 
 Birikmis kucuk iyilestirmeler (istenirse ayri dilimler): kalici indirme

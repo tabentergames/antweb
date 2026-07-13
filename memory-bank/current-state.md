@@ -65,6 +65,7 @@ Son guncelleme: 2026-07-13
   - **F5 — Web clipper:** web sayfasinda secili metin varsa TabX context menusunde "Nota kaydet" eylemi gorunur. `clip_to_note` secimi, sayfa basligini ve kaynak URL'sini `NoteInputDialog` icine onceden doldurur; onaylanan kirpinti mevcut profil bazli `NotesStore`a yazilir. Modal cagri `_prompt_clip_note` ile test edilebilir karar noktasindan ayrilmistir.
   - **F6 — DevTools entegrasyonu:** `features/devtools/window.py` icindeki `DevToolsController` tek bir ayrik, tasinabilir ve yeniden boyutlandirilabilir Chromium DevTools penceresini aktif sekmeye `QWebEnginePage.setDevToolsPage` ile baglar. Ayni sekmede tekrar acilis mevcut pencereyi one getirir; sekme/profil/workspace/tema kabugu veya uygulama kapanirken guvenli bicimde ayrilir. Toolbar `⋯` menusu, context menu "Incele" eylemi ve `Ctrl+Alt+I` kisayolu ile erisilir.
   - **F6 — Snippet kutuphanesi:** `features/devtools/snippet_store.py` profil bazli `data/devtools-<profil>.db` icinde JS/CSS snippet'lerini saklar. `SnippetLibraryWindow` ayrik, tasinabilir pencerede ekle/listele/sil/onizle/calistir akisini sunar ve tum QSS degerleri `Theme` tokenlarindan gelir. `SnippetController.execute` JS kodunu dogrudan, CSS kodunu ayni snippet tekrarinda onceki `<style>` dugumunu guncelleyen JSON-escaped enjeksiyonla uygular. Otomatik calistirma yoktur; cekirdek yalnizca kullanici eyleminde aktif `QWebEnginePage`i runner'a verir.
+  - **F6 — User-agent gecisi:** `features/devtools/user_agent.py` profil bazli `developer_settings` tablosunda varsayilan/mobil/ozel modu saklar. `UserAgentController` profil kurulumunda tercihi `QWebEngineProfile.setHttpUserAgent` ile uygular; varsayilana `None` ile gercek QtWebEngine UA'sina doner. Mobil UA sabit Chrome surumu tasimaz, aktif QtWebEngine UA'sindaki Chrome surumunden turetilir. Token tabanli modal toolbar `⋯` menusunden acilir; degisiklik yeni isteklere uygulanir.
   - **Urun notu — moduler/yer degistirilebilir yapi:** panel, widget, arac ve uretkenlik yuzeyleri ileride farkli konuma/erisime alinabilecek sekilde bagimsiz tasarlanmalidir. Bu not `memory-bank/project-brief.md` ve `docs/AGENT_WORKFLOW.md` icine islendi.
 
 ## Ana teknik borc
@@ -76,7 +77,7 @@ Son guncelleme: 2026-07-13
 - Favicon'lar oturumlar arasi cache'lenmiyor (her sayfa yuklendiginde yeniden gelir). Omnibox onerileri/gecmis tamamlama yok (arama motoru secimi var).
 - History'de arama/filtre, bookmark'ta etiket/klasor yok; ilk dilim bilincli olarak sade.
 - Test paketi olarak yalnizca `scripts/smoke_test.py` var; `tests/` altinda state-store ve motion testleri eklenmeli.
-- F5 tamamlandi. F6 basladi; DevTools entegrasyonu ve snippet kutuphanesi tamamlandi. Siradaki F6 dilimi user-agent gecisidir; request capture sonrasinda F6 kapanir.
+- F5 tamamlandi. F6'da DevTools, snippet kutuphanesi ve user-agent gecisi tamamlandi. Kalan tek F6 dilimi request capture'dir; tamamlaninca F6 kapanir.
 
 ## Cikis kriteri
 

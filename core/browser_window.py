@@ -29,7 +29,11 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 # F3 privacy layer
 from features.privacy.service import PrivacyService
 from features.downloads.manager import DownloadManager
-from features.devtools import DevToolsController, SnippetController
+from features.devtools import (
+    DevToolsController,
+    SnippetController,
+    UserAgentController,
+)
 from features.library.store import BookmarkStore, HistoryStore
 from features.productivity.kanban_store import KanbanStore
 from features.productivity.notes_store import NotesStore
@@ -816,6 +820,7 @@ class BrowserWindow(QMainWindow):
         profile.setPersistentStoragePath(str(data_dir / "storage"))
         profile.setCachePath(str(data_dir / "cache"))
         self.web_profile = profile
+        self.user_agent = UserAgentController(self.profile_name, profile, self)
         self.privacy = PrivacyService(profile)
         self.privacy.set_ad_block_enabled(self.ad_block_enabled)
         self.privacy.set_https_upgrade_enabled(self.https_upgrade_enabled)
@@ -865,6 +870,7 @@ class BrowserWindow(QMainWindow):
 
         self.devtools.close()
         self.snippets.close()
+        self.user_agent.close()
         self.current_view = None
         self.todos.close()
         self.kanban.close()
@@ -1136,6 +1142,7 @@ class BrowserWindow(QMainWindow):
         more_menu.addSeparator()
         more_menu.addAction("⌁  Geliştirici araçları", self.open_devtools)
         more_menu.addAction("⌘  Snippet kütüphanesi", self.open_snippet_library)
+        more_menu.addAction("◎  User-agent", self.open_user_agent_dialog)
         more_menu.addAction("⚙  Ayarlar", lambda: self.open_internal_page("settings"))
         more_menu.addAction("?  Hakkında", lambda: self.open_internal_page("about"))
         more_btn.setMenu(more_menu)
@@ -1739,6 +1746,7 @@ class BrowserWindow(QMainWindow):
         self.kanban.close()
         self.notes.close()
         self.snippets.close()
+        self.user_agent.close()
         # Eski profil nesnesi acik sayfalar yok edilene kadar yasamali.
         self._retired_profiles.append(self.web_profile)
 
@@ -2516,6 +2524,10 @@ class BrowserWindow(QMainWindow):
         """Snippet runner'a yalnizca aktif sayfayi aktarir."""
         page = self.current_view.page() if self.current_view is not None else None
         return self.snippets.execute(snippet_id, page)
+
+    def open_user_agent_dialog(self) -> bool:
+        """Aktif profil icin user-agent secim modalini acar."""
+        return self.user_agent.open_dialog()
 
     # ------------------------------------------------------------------
     # Klavye kisayollari
