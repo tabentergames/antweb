@@ -76,7 +76,7 @@ Kullanici geri bildirimiyle acildi (2026-07-07): sag panel/toolbar/ayarlar sadel
 | done | Floating todo widget | Toolbar `✓` ile acilan glass overlay; profil bazli SQLite (`features/productivity/todo_store.py`), ekle/tamamla/sil. |
 | done | Kanban board | `tabx://tasks` ic sayfasi; profil bazli SQLite (`features/productivity/kanban_store.py`), backlog/doing/done kolonlari, ekle/tasi/sil. |
 | done | Not sistemi | `tabx://notes` ic sayfasi; profil bazli SQLite (`features/productivity/notes_store.py`), baslik+Markdown metni ekle/listele/sil. |
-| todo | Web clipper | Secim veya sayfa metni kaydetme. |
+| done | Web clipper | Sag tik menusunden secili metni sayfa basligi ve kaynak URL'siyle, onceden doldurulmus not dialogu uzerinden profil bazli nota kaydeder. |
 
 ## F6 - Developer Tools
 
@@ -85,7 +85,7 @@ Kullanici geri bildirimiyle acildi (2026-07-07): sag panel/toolbar/ayarlar sadel
 | todo | Snippet kutuphanesi | JS/CSS snippet kaydet, secili sekmede calistir. |
 | todo | User-agent gecisi | Sekme veya profil bazli. |
 | todo | Network/request capture | MVP icin URL/interceptor log paneli. |
-| todo | DevTools entegrasyonu | QtWebEngine DevTools penceresi veya paneli. |
+| done | DevTools entegrasyonu | `features/devtools/` altinda tek, ayrik ve yeniden boyutlandirilabilir Chromium DevTools penceresi; aktif sekmeye `setDevToolsPage` ile baglanir, menu/sag tik/Ctrl+Alt+I erisimi vardir. |
 
 ## F7 - Power UX (Opera-benzeri yetenekler)
 
@@ -114,5 +114,5 @@ Her biri kapatilabilir modul olarak `features/` altina gider; cekirdege gomulmez
 | done | Sekme favicon'lari | `iconChanged` -> `setTabIcon` -> `TabButton.set_icon` (16px, nokta fallback). Fan kartlarinda kullanim sonraki dilim. |
 | done | Error page | `loadingChanged`/`LoadFailedStatus` -> `_show_error_page`; TabX temali sablon (tekrar dene + ana sayfa), abort'lar (`LoadStoppedStatus`) hata sayilmaz, HTTPS-fallback ile carpismaz. E2E dogrulandi (gercek DNS hatasi). |
 | done | Arama motoru secimi | `UiStateStore.search_engines` (Google/Bing/DuckDuckGo/Yandex); `tabx://settings/search-engine?value=` pill grubu, `search_url()` helper. Adres cubugu URL olmayan girdiyi secili motorda arar; grup/kisayol fallback'i de ayni motoru kullanir. |
-| done | Context menu | `BrowserTab.contextMenuEvent` + `_build_context_menu` — geri/ileri/yenile, linki yeni sekmede ac, link/secim/sayfa adresi kopyala; `_menu_style()` temali. Inspect F6 DevTools dilimine ertelendi. |
+| done | Context menu | `BrowserTab.contextMenuEvent` + `_build_context_menu` — geri/ileri/yenile, linki yeni sekmede ac, link/secim/sayfa adresi kopyala ve F6 DevTools "Incele" eylemi; `_menu_style()` temali. |
 | done | Keyboard shortcuts | `_setup_shortcuts` — Cmd+T/W/R, Cmd+[/], Cmd+L (adres), fiziksel Ctrl+Tab (sekme dongusu), Cmd+1..9 (9=son), Cmd+Y (gecmis), Cmd+Shift+J (indirilenler). ApplicationShortcut context. Ayarlanabilir kisayollar sonraki dilim. |

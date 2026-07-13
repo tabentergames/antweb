@@ -29,6 +29,7 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 # F3 privacy layer
 from features.privacy.service import PrivacyService
 from features.downloads.manager import DownloadManager
+from features.devtools import DevToolsController
 from features.library.store import BookmarkStore, HistoryStore
 from features.productivity.kanban_store import KanbanStore
 from features.productivity.notes_store import NotesStore
@@ -366,7 +367,7 @@ class ConfirmDialog(QDialog):
 class NoteInputDialog(QDialog):
     """Local not olusturma dialogu."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, title: str = "", body: str = "") -> None:
         super().__init__(parent)
         self.setWindowTitle("Yeni not")
         self.setModal(True)
@@ -387,12 +388,14 @@ class NoteInputDialog(QDialog):
         self.title_input.setPlaceholderText("Başlık")
         self.title_input.setFixedHeight(40)
         self.title_input.setStyleSheet(self._input_style())
+        self.title_input.setText(title)
         layout.addWidget(self.title_input)
 
         self.body_input = QPlainTextEdit()
         self.body_input.setPlaceholderText("Markdown not içeriği")
         self.body_input.setFixedHeight(180)
         self.body_input.setStyleSheet(self._text_style())
+        self.body_input.setPlainText(body)
         layout.addWidget(self.body_input)
 
         actions = QHBoxLayout()
@@ -406,8 +409,10 @@ class NoteInputDialog(QDialog):
         layout.addLayout(actions)
 
     @classmethod
-    def get_note(cls, parent):
-        dialog = cls(parent)
+    def get_note(
+        cls, parent, title: str = "", body: str = ""
+    ) -> tuple[str, str, bool]:
+        dialog = cls(parent, title=title, body=body)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return "", "", False
         return (
@@ -727,17 +732,24 @@ class BrowserTab(QWebEngineView):
                 "✂  Seçimi kopyala",
                 lambda: self.pageAction(QWebEnginePage.WebAction.Copy).trigger(),
             )
-            menu.addAction(
-                "📌  Nota kaydet",
-                lambda: self._shell.clip_to_note(selected_text),
-            )
+            if self._shell is not None and hasattr(self._shell, "clip_to_note"):
+                menu.addAction(
+                    "📌  Nota kaydet",
+                    lambda: self._shell.clip_to_note(selected_text),
+                )
 
         menu.addSeparator()
         menu.addAction(
             "⎘  Sayfa adresini kopyala",
             lambda: QApplication.clipboard().setText(self.url().toString()),
         )
+        if self._shell is not None and hasattr(self._shell, "open_devtools"):
+            menu.addAction("⌁  İncele", self._inspect_context_element)
         return menu
+
+    def _inspect_context_element(self) -> None:
+        self._shell.open_devtools()
+        self.pageAction(QWebEnginePage.WebAction.InspectElement).trigger()
 
     def _configure_memory_profile(self):
         settings = self.settings()
@@ -783,6 +795,7 @@ class BrowserWindow(QMainWindow):
         Motion.configure(not self.reduced_motion)
         # Indirmeler oturum kapsaminda tutulur; profil gecisinde korunur.
         self.downloads = DownloadManager(self)
+        self.devtools = DevToolsController(self)
         self._setup_web_profile()
 
         app = QApplication.instance()
@@ -848,6 +861,7 @@ class BrowserWindow(QMainWindow):
         # Sayfalar profilden once yok edilmeli; deleteLater kapanista islenmez.
         from PyQt6 import sip
 
+        self.devtools.close()
         self.current_view = None
         self.todos.close()
         self.kanban.close()
@@ -1116,6 +1130,8 @@ class BrowserWindow(QMainWindow):
         more_menu.addAction("⬇  İndirilenler", lambda: self.open_internal_page("downloads"))
         more_menu.addAction("▦  Görev Tahtası", lambda: self.open_internal_page("tasks"))
         more_menu.addAction("✎  Notlar", lambda: self.open_internal_page("notes"))
+        more_menu.addSeparator()
+        more_menu.addAction("⌁  Geliştirici araçları", self.open_devtools)
         more_menu.addAction("⚙  Ayarlar", lambda: self.open_internal_page("settings"))
         more_menu.addAction("?  Hakkında", lambda: self.open_internal_page("about"))
         more_btn.setMenu(more_menu)
@@ -1674,20 +1690,24 @@ class BrowserWindow(QMainWindow):
 
     def clip_to_note(self, selected_text: str) -> None:
         """Secili metni not olarak kaydeder."""
-        # Aktif sekmenin basligini otomatik title olarak kullan
-        current_tab = self.tabs.currentWidget()
-        page_title = current_tab.title() if current_tab else "TabX"
-        
-        # Nota ekle dialogu ac
-        note_text, ok = NoteInputDialog.get_note(self)
-        if not ok:
+        selected_text = selected_text.strip()
+        if not selected_text:
             return
-        title, body = note_text
-        
-        # Body'e secili metni ekleyip duzenle
-        if selected_text.strip():
-            body = f"{body}\n\n---\nSecili metin ({page_title}):\n{selected_text}".strip()
-        self.notes.add(title, body)
+        current_tab = self.current_view
+        page_title = (current_tab.title() if current_tab else "").strip()
+        page_title = page_title or "Web kırpıntısı"
+        page_url = current_tab.url().toString() if current_tab else ""
+        source = f"Kaynak: {page_title}"
+        if page_url:
+            source = f"{source}\n{page_url}"
+        body = f"{selected_text}\n\n---\n{source}"
+        title, body, ok = self._prompt_clip_note(page_title, body)
+        if ok:
+            self.notes.add(title, body)
+
+    def _prompt_clip_note(self, title: str, body: str) -> tuple[str, str, bool]:
+        """Kirpma akisinin modal kismini smoke testten ayirir."""
+        return NoteInputDialog.get_note(self, title=title, body=body)
 
     # ------------------------------------------------------------------
     # F4 — profil ve workspace
@@ -1762,6 +1782,7 @@ class BrowserWindow(QMainWindow):
 
     def _reset_tabs(self):
         """Tum acik sekmeleri ve view'leri kaldirir (workspace/profil gecisi)."""
+        self.devtools.close()
         if self._fan_overlay is not None:
             self._fan_overlay.dismiss()
         self._tab_snapshots.clear()
@@ -1849,6 +1870,7 @@ class BrowserWindow(QMainWindow):
 
     def _rebuild_visual_shell(self):
         # Acik sekmeler kaybolmasin: oturumu kaydet, kabugu kur, geri yukle.
+        self.devtools.close()
         if self._fan_overlay is not None:
             self._fan_overlay.dismiss()
         self.browser_chrome_hidden = False
@@ -2322,6 +2344,7 @@ class BrowserWindow(QMainWindow):
         if index < len(self.tabs._views):
             view = self.tabs._views[index]
             if view:
+                self.devtools.detach_from(view.page())
                 # Snapshot removeWidget'tan ONCE alinmali; sonrasi bos pixmap.
                 if (
                     Motion.enabled
@@ -2473,6 +2496,12 @@ class BrowserWindow(QMainWindow):
         if self.current_view and hasattr(self.current_view, "reload"):
             self.current_view.reload()
 
+    def open_devtools(self):
+        """Aktif sekmeyi ayrik Chromium DevTools penceresine baglar."""
+        if self.current_view is None:
+            return None
+        return self.devtools.open_for(self.current_view.page())
+
     # ------------------------------------------------------------------
     # Klavye kisayollari
     # ------------------------------------------------------------------
@@ -2495,6 +2524,7 @@ class BrowserWindow(QMainWindow):
             (QKeySequence("Meta+Shift+Tab"), lambda: self.cycle_tab(-1)),
             (QKeySequence("Ctrl+Y"), lambda: self.open_internal_page("history")),
             (QKeySequence("Ctrl+Shift+J"), lambda: self.open_internal_page("downloads")),
+            (QKeySequence("Ctrl+Alt+I"), self.open_devtools),
         ]
         for number in range(1, 10):
             bindings.append(

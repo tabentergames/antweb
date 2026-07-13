@@ -123,7 +123,7 @@ Mevcut tarayıcılardan en iyi özellikleri alıp bunlara yenilerini ekleyerek o
 
 ### 🛠️ Geliştirici Araçları
 
-- **Gelişmiş DevTools** — Chromium DevTools üzerine ek paneller ve özelleştirmeler
+- **Chromium DevTools** — Aktif sekme için ayrık, taşınabilir pencere; `Ctrl+Alt+I`, sağ tık “İncele” veya `⋯` menüsünden açılır
 - **Terminal entegrasyonu** — Tarayıcı içinden doğrudan terminal erişimi
 - **Kodlama modu** — Yerleşik kod editörü, tarayıcıyla yan yana çalışma
 - **Local sunucu (PHP + MySQL)** — XAMPP benzeri, tarayıcı içi local geliştirme ortamı
@@ -139,12 +139,12 @@ Mevcut tarayıcılardan en iyi özellikleri alıp bunlara yenilerini ekleyerek o
 
 | Aşama                              | Kapsam                                                              | Durum             |
 | ---------------------------------- | ------------------------------------------------------------------ | ----------------- |
-| **v0.1** — Çekirdek (MVP)          | QtWebEngine entegrasyonu, sekme + navigasyon, ayar/tema altyapısı   | 🔄 Geliştiriliyor |
-| **v0.2** — Görsel & Sekmeler       | Tema kabuğu başladı; fan sekme modu ve esnek sekme konumu sırada    | 🔄 Geliştiriliyor |
-| **v0.3** — Gizlilik Katmanı        | TabX eklenti sistemi, ad/tracker blocking, HTTPS upgrade, izinler   | 📋 Planlandı      |
-| **v0.4** — Profil & Workspace      | Çoklu profil, workspace, oturum kaydetme, sekme grupları            | 📋 Planlandı      |
-| **v0.5** — Productivity            | Todo, Kanban board, zaman takibi, takvim (floating widget'lar)      | 🔄 Başladı        |
-| **v0.6** — Geliştirici Araçları    | Terminal, kodlama modu, snippet kütüphanesi, istek yakalama         | 📋 Planlandı      |
+| **v0.1** — Çekirdek (MVP)          | QtWebEngine entegrasyonu, sekme + navigasyon, ayar/tema altyapısı   | ✅ Tamamlandı     |
+| **v0.2** — Görsel & Sekmeler       | Tema motoru, esnek sekme konumu, motion ve fan sekme modu           | ✅ Tamamlandı     |
+| **v0.3** — Gizlilik Katmanı        | TabX eklenti sistemi, ad/tracker blocking, HTTPS upgrade, izinler   | ✅ Tamamlandı     |
+| **v0.4** — Profil & Workspace      | Çoklu profil, workspace, oturum kaydetme, sekme grupları            | ✅ Tamamlandı     |
+| **v0.5** — Productivity            | Floating todo, Kanban, yerel notlar ve seçili metin web clipper     | ✅ Tamamlandı     |
+| **v0.6** — Geliştirici Araçları    | DevTools tamamlandı; snippet, user-agent ve istek yakalama sırada   | 🔄 Başladı        |
 | **v1.0** — Kararlı Sürüm           | Firma içi pilot tamamlandı, performans optimizasyonu, cross-platform | 🎯 Hedef          |
 | **v2.0** — Bulut & Premium         | Bulut sync, takım workspace'leri, premium özellikler                | 💡 Vizyon         |
 | **Araştırma** — Tam Uzantı Desteği | Chromium fork / CEF değerlendirmesi (yalnızca ölçek gerektirir)     | 🔬 Araştırma      |

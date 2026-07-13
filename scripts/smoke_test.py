@@ -313,8 +313,10 @@ def run() -> int:
     assert "ornek.zip" in window._internal_page_html("downloads"), "downloads sayfasi kaydi gostermiyor"
 
     # Klavye kisayollari — nesneler kurulu, sekme gecis slot'lari dogru calisiyor.
-    assert len(window._shortcuts) == 19, "kisayol sayisi beklenenden farkli"
+    assert len(window._shortcuts) == 20, "kisayol sayisi beklenenden farkli"
     assert all(not sc.key().isEmpty() for sc in window._shortcuts), "bos kisayol dizisi var"
+    shortcut_keys = {sc.key().toString() for sc in window._shortcuts}
+    assert "Ctrl+Alt+I" in shortcut_keys, "DevTools kisayolu kayitli degil"
 
     kb_before = window.tabs.count()
     window.add_new_tab()
@@ -380,13 +382,46 @@ def run() -> int:
     assert any("yeni sekmede" in t for t in texts), "linki yeni sekmede ac yok"
     assert any("Link adresini" in t for t in texts), "link kopyala yok"
     assert any("Seçimi kopyala" in t for t in texts), "secim kopyala yok"
+    assert any("Nota kaydet" in t for t in texts), "web clipper eylemi yok"
+    assert any("İncele" in t for t in texts), "DevTools context eylemi yok"
+
+    original_clip_prompt = window._prompt_clip_note
+    window._prompt_clip_note = lambda title, body: (title, body, True)
+    window.clip_to_note("Smoke kırpıntısı")
+    clipped_notes = window.notes.all()
+    clipped_note = next(
+        (note for note in clipped_notes if "Smoke kırpıntısı" in note[2]), None
+    )
+    assert clipped_note is not None, "web clipper notu kaydetmedi"
+    assert "Kaynak:" in clipped_note[2], "web clipper kaynak bilgisini eklemedi"
+    window.notes.remove(clipped_note[0])
+    window._prompt_clip_note = original_clip_prompt
+
     plain_menu = window.current_view._build_context_menu(QUrl(), "")
     plain_texts = [a.text() for a in plain_menu.actions() if a.text()]
     assert not any("yeni sekmede" in t for t in plain_texts), "linksiz menude link eylemi var"
     assert not any("Seçimi kopyala" in t for t in plain_texts), "secimsiz menude kopyala var"
+    assert not any("Nota kaydet" in t for t in plain_texts), "secimsiz menude clipper var"
     assert any("Sayfa adresini" in t for t in plain_texts), "sayfa adresi kopyala yok"
+    assert any("İncele" in t for t in plain_texts), "linksiz menude DevTools eylemi yok"
+
+    # F6 — DevTools penceresi aktif sayfaya baglanir, tekrar kullanilir ve ayrilir.
+    inspected_page = window.current_view.page()
+    devtools_window = window.open_devtools()
+    assert devtools_window is not None and window.devtools.is_open(), (
+        "DevTools penceresi acilmadi"
+    )
+    assert inspected_page.devToolsPage() is devtools_window.view.page(), (
+        "DevTools aktif sayfaya baglanmadi"
+    )
+    assert window.open_devtools() is devtools_window, "DevTools penceresi tekrar kullanilmadi"
+    window.devtools.close()
+    assert inspected_page.devToolsPage() is None, "DevTools sayfadan ayrilmadi"
+    assert not window.devtools.is_open(), "DevTools controller kapanmadi"
 
     # Arama motoru secimi — kalicilik + search_url + adres cubugu fallback'i.
+    original_search_engine = window.search_engine
+    window.set_search_engine("google")
     assert window.search_engine == "google", "varsayilan arama motoru google olmali"
     assert "google.com/search?q=merhaba%20d%C3%BCnya" in window.search_url("merhaba dünya").replace("+", "%20") or "google.com/search" in window.search_url("merhaba dünya"), "search_url google uretmedi"
     window.set_search_engine("duckduckgo")
@@ -408,6 +443,7 @@ def run() -> int:
     window.navigate_to_url()
     assert "example.com" in window.current_view.url().toString(), "duz alan adi URL sayilmadi"
     assert window.tabs.count() == se_before, "arama testi sekme sayisini degistirdi"
+    window.set_search_engine(original_search_engine)
 
     # F3 — site veri temizleme: onayli akis + tek seferlik rozet.
     window._confirm_clear_site_data = lambda: True

@@ -1,9 +1,27 @@
 # Agent Handoff
 
-Son guncelleme: 2026-07-09
+Son guncelleme: 2026-07-13
 
 ## Son kararlar
 
+- **F6 DevTools entegrasyonu tamamlandi (2026-07-13):**
+  `features/devtools/window.py` cekirdekten ayri `DevToolsWindow` ve
+  `DevToolsController` saglar. Tek DevTools penceresi aktif sayfanin profiliyle
+  olusturulan `QWebEnginePage`e baglanir; ayni hedefte tekrar acilis pencereyi
+  one getirir. Kapanista `setDevToolsPage(None)` ile ayrilir. Hedef sekme,
+  workspace/profil, tema kabugu veya uygulama kapanirken controller da kapanir;
+  `destroyed` baglantisi lambda degil QObject slot'udur (silinmis PyQt wrapper
+  cagrisini onler). Erisim: toolbar `⋯`, her sayfadaki context menu "Incele"
+  ve `Ctrl+Alt+I`. Chromium DevTools frontend'i kendi stilini yonetir; TabX
+  QSS/webview efekti uygulanmaz. Smoke test baglanma, yeniden kullanim ve
+  ayrilmayi dogrular.
+- **F5 web clipper tamamlandi; F5 FAZI KAPANDI (2026-07-13):**
+  Secili metin varsa `BrowserTab._build_context_menu` "Nota kaydet" eylemini
+  gosterir. `BrowserWindow.clip_to_note` secimi, sayfa basligini ve kaynak
+  URL'sini `NoteInputDialog` icine onceden doldurur; kullanici onayindan sonra
+  mevcut profilin `NotesStore`una yazar. Modal kisim `_prompt_clip_note`
+  metoduna ayrildi; smoke test gercek dialog acmadan kaydi ve kaynak bilgisini
+  dogrular. Bos secimde eylem gosterilmez ve kayit olusturulmaz.
 - **F7 scroll auto-hide browser chrome tamamlandi (2026-07-09):**
   Her yeni sekmede `page().scrollPositionChanged` -> `_handle_scroll_position`
   baglanir. Asagi scroll'da `hide_browser_chrome()` tab strip + toolbar'i
@@ -285,25 +303,22 @@ Son guncelleme: 2026-07-09
 
 ## Bir sonraki agent icin onerilen ilk gorev
 
-"Temel tarayici yuzeyleri", F2.5 ve F3 fazlari KAPANDI. F5 Productivity
-basladi; floating todo widget, Kanban board ve not sistemi tamamlandi. Acik
-fazlar artik F5 web-clipper devam isi, F6 Developer Tools ve F7 Power UX.
+"Temel tarayici yuzeyleri", F2.5, F3 ve F5 fazlari KAPANDI. F6 Developer
+Tools basladi ve DevTools penceresi tamamlandi. Siradaki `todo` olan snippet
+kutuphanesi tek dilim halinde ele alinmali: profil bazli local store, kayitli
+JS/CSS snippet listesi ve yalnizca aktif sekmede acik kullanici eylemiyle
+calistirma. User-agent ve request capture bu dilime karistirilmamali.
 
-F5'ten devam edilecekse siradaki en dogal dilim web clipper'dir; secili
-metni veya sayfa basligini local nota kaydetme ile kucuk tutulmali.
 Kullanici F7 isterse komut paleti iyi ilk adaydir:
 FanOverlay'in scrim+glass+ESC/dis-tiklama deseni, `_setup_shortcuts`
-(Ctrl+K eklenir), `Theme` tokenlari. F6 secilirse DevTools penceresi
-(QWebEnginePage.setDevToolsPage) en somut baslangic.
+(Ctrl+K eklenir) ve `Theme` tokenlari kullanilmalidir.
 
 Net teslim kriteri:
 
 - F7 komut paleti secilirse `FanOverlay` scrim/glass/ESC desenini kullan;
   komutlar sekme/ayar/ic sayfa acma gibi mevcut calisan yuzeylerle sinirli kalsin.
-- F5 devam ederse web clipper icin mevcut `NotesStore`u kullan; secim metni
-  yakalama/cagirma cekirdege minimum baglansin.
-- F6 secilirse DevTools penceresi en somut baslangic; `QWebEnginePage.setDevToolsPage`
-  yolunu izole bir feature olarak kur.
+- F6 snippet diliminde veri/UI `features/devtools/` altinda kalmali; cekirdek
+  yalnizca aktif sayfayi calistiriciya vermeli.
 - `python3 main.py` + `python3 scripts/smoke_test.py` geciyor.
 
 Birikmis kucuk iyilestirmeler (istenirse ayri dilimler): kalici indirme

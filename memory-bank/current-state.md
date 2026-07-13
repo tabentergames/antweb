@@ -1,6 +1,6 @@
 # Current State
 
-Son guncelleme: 2026-07-09
+Son guncelleme: 2026-07-13
 
 ## Repodaki gercek durum
 
@@ -62,6 +62,8 @@ Son guncelleme: 2026-07-09
   - **F5 — Floating todo widget:** `features/productivity/todo_store.py` profil bazli SQLite (`data/productivity-<profil>.db`) kullanir. Toolbar `✓` butonu `TodoFloatingPanel` glass overlay'ini acar/kapatir; gorev ekleme, tamamlandi isaretleme ve hover-reveal silme calisir. Panel merkez widget'a parent'li overlay'dir, webview'e efekt uygulanmaz; `Motion.enabled=False` yolunda aninda acilip kapanir.
   - **F5 — Kanban board:** `features/productivity/kanban_store.py` ayni profil bazli SQLite dosyasinda `kanban_cards` tablosunu kullanir. `tabx://tasks` ic sayfasi backlog/doing/done kolonlarini gosterir; kart ekleme modal dialog ile, tasima/silme ic sayfa komut linkleriyle calisir. Sol panel ve `⋯` menuden erisilir.
   - **F5 — Not sistemi:** `features/productivity/notes_store.py` ayni profil bazli SQLite dosyasinda `notes` tablosunu kullanir. `tabx://notes` ic sayfasi notlari listeler; `NoteInputDialog` ile baslik+Markdown metni eklenir, silme ic sayfa komut linkiyle calisir. Markdown ilk dilimde parser'siz, pre-wrap duz metin olarak gosterilir.
+  - **F5 — Web clipper:** web sayfasinda secili metin varsa TabX context menusunde "Nota kaydet" eylemi gorunur. `clip_to_note` secimi, sayfa basligini ve kaynak URL'sini `NoteInputDialog` icine onceden doldurur; onaylanan kirpinti mevcut profil bazli `NotesStore`a yazilir. Modal cagri `_prompt_clip_note` ile test edilebilir karar noktasindan ayrilmistir.
+  - **F6 — DevTools entegrasyonu:** `features/devtools/window.py` icindeki `DevToolsController` tek bir ayrik, tasinabilir ve yeniden boyutlandirilabilir Chromium DevTools penceresini aktif sekmeye `QWebEnginePage.setDevToolsPage` ile baglar. Ayni sekmede tekrar acilis mevcut pencereyi one getirir; sekme/profil/workspace/tema kabugu veya uygulama kapanirken guvenli bicimde ayrilir. Toolbar `⋯` menusu, context menu "Incele" eylemi ve `Ctrl+Alt+I` kisayolu ile erisilir.
   - **Urun notu — moduler/yer degistirilebilir yapi:** panel, widget, arac ve uretkenlik yuzeyleri ileride farkli konuma/erisime alinabilecek sekilde bagimsiz tasarlanmalidir. Bu not `memory-bank/project-brief.md` ve `docs/AGENT_WORKFLOW.md` icine islendi.
 
 ## Ana teknik borc
@@ -73,7 +75,7 @@ Son guncelleme: 2026-07-09
 - Favicon'lar oturumlar arasi cache'lenmiyor (her sayfa yuklendiginde yeniden gelir). Omnibox onerileri/gecmis tamamlama yok (arama motoru secimi var).
 - History'de arama/filtre, bookmark'ta etiket/klasor yok; ilk dilim bilincli olarak sade.
 - Test paketi olarak yalnizca `scripts/smoke_test.py` var; `tests/` altinda state-store ve motion testleri eklenmeli.
-- F5 devam ediyor; floating todo widget, Kanban board ve not sistemi tamamlandi. Siradaki F5 dilimi web clipper.
+- F5 tamamlandi. F6 basladi; DevTools entegrasyonu tamamlandi. Siradaki F6 dilimi snippet kutuphanesidir; user-agent gecisi ve request capture sonrasinda F6 kapanir.
 
 ## Cikis kriteri
 
