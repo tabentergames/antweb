@@ -1,8 +1,42 @@
 # Agent Handoff
 
-Son guncelleme: 2026-07-13
+Son guncelleme: 2026-07-14
 
 ## Son kararlar
+
+- **F7 ozellestirme merkezi teslim edildi — F7 FAZI KAPANDI (2026-07-14):**
+  `tabx://customize` kullanici onayli tasarim taslagindan implemente edildi
+  (kabuk haritasi solda sticky, editor kartlari sagda). Kritik desenler:
+  (1) Toolbar'a alinabilir eylemler `_shell_actions()` tek kaydinda —
+  yeni toolbar eylemi eklerken BU kayda ekle, `_create_toolbar`'a elle buton
+  yazma; dict sirasi ⋯ menu sirasini belirler. (2) Duzen mutasyonlari
+  `move_shell_action`/`shift_shell_action`/`toggle_shell_section`/
+  `reset_shell_layout` metodlarinda — komut linkleri ince glue, smoke test
+  metodlari dogrudan cagirir. (3) Kabugu degistiren komutlar navigasyon
+  callback'inde `QTimer.singleShot(0, self._rebuild_visual_shell)` ile
+  ertelenir (view yikilir, sayfa oturumdan geri gelir); newtab bolum
+  toggle'lari rebuild GEREKTIRMEZ, sayfa reload yeter. (4) Kapali sidebar
+  bolumunde layout attr'i (or. `tab_groups_layout`) None atanir; render
+  guard'lari `getattr(..., None) is None` — hasattr KULLANMA, rebuild
+  sonrasi silinmis C++ nesnesine dokunur. (5) Smoke test toggle'lardan once
+  bolumu ACIK garanti eder (onceki basarisiz kosunun kirlettigi state'e
+  dayaniklilik) ve `layout_backup`'i sonda geri yukler. Ertelenen dilimler:
+  pointer drag siralama, modul basina erisim cipleri, kisayol editoru.
+
+- **Tasarim + fonksiyon denetimi ve borc temizligi (2026-07-14):** SKILL.md ve
+  DESIGN_SYSTEM'e gore denetim yapildi. Sahte UI kaldirildi ("Son aktiviteler",
+  islevsiz Web Haritasi dugumleri — artik tiklaninca site acar). `Theme`'e
+  `danger`/`success`/`focus_ring` tokenlari eklendi; sayfa ici sabit hex'ler
+  tokenlara baglandi, `subtle` her iki temada WCAG AA'ya cekildi. Ic sayfa
+  CSS'i artik `--motion-fast` (`Motion.FAST`, reduced-motion'da 0ms) ve
+  `--danger` interpolasyonu aliyor — yeni ic sayfa isleri bu deseni kullanmali.
+  Olu `_devtools_page_html` silindi (snippet akisi `SnippetLibraryWindow`'da).
+  README "Ozellikler" Mevcut/Planlanan olarak ayrildi — yeni ozellik teslim
+  eden agent maddeyi Planlanan'dan Mevcut'a tasimali. SKILL.md bosluk
+  sozlesmesi `Theme.SPACE_*` (4/8/12/16/24) olarak netlestirildi. Acik kalan
+  tasarim borclari: Qt kabugu `Arial` vs ic sayfa sistem fontu ikiligi, ikon
+  ailesinin teklestirilmesi (⌘ cift anlamli), ic sayfa spacing'lerinin
+  SPACE tokenlarina tasinmasi.
 
 - **F7 yeniden acildi — tasarimsal donum noktasi:** Teknik Power UX modulleri
   teslim edilmis olsa da kullanici F7'nin urunun ozellestirilebilirlik ve UI

@@ -85,6 +85,7 @@ class UiStateStore:
         "speed_dials_by_profile": {},
         "web_panels_by_profile": {},
         "power_ux": {},
+        "shell_layout_by_profile": {},
         "tab_groups": [
             {
                 "name": "Work",
@@ -189,6 +190,8 @@ class UiStateStore:
                 state["web_panels_by_profile"] = loaded["web_panels_by_profile"]
             if isinstance(loaded.get("power_ux"), dict):
                 state["power_ux"] = loaded["power_ux"]
+            if isinstance(loaded.get("shell_layout_by_profile"), dict):
+                state["shell_layout_by_profile"] = loaded["shell_layout_by_profile"]
             if isinstance(loaded.get("tab_groups"), list):
                 state["tab_groups"] = loaded["tab_groups"]
         return state
@@ -211,6 +214,7 @@ class UiStateStore:
         speed_dials_by_profile=None,
         web_panels_by_profile=None,
         power_ux=None,
+        shell_layout_by_profile=None,
     ):
         cls.state_path.parent.mkdir(parents=True, exist_ok=True)
         profiles = [str(p) for p in (profiles or ["default"])] or ["default"]
@@ -235,6 +239,9 @@ class UiStateStore:
                 web_panels_by_profile if isinstance(web_panels_by_profile, dict) else {}
             ),
             "power_ux": power_ux if isinstance(power_ux, dict) else {},
+            "shell_layout_by_profile": (
+                shell_layout_by_profile if isinstance(shell_layout_by_profile, dict) else {}
+            ),
             "tab_groups": [
                 {
                     "name": str(name),
@@ -289,7 +296,7 @@ class TextInputDialog(QDialog):
                 selection-background-color: {Theme.purple};
             }}
             QLineEdit:focus {{
-                border-color: #b7a7ff;
+                border-color: {Theme.focus_ring};
             }}
             """
         )
@@ -331,7 +338,7 @@ class TextInputDialog(QDialog):
                 font-weight: 800;
             }}
             QPushButton:hover {{
-                background-color: {"#6d50ea" if primary else "#e9ecf4"};
+                background-color: {Theme.mix(Theme.purple, Theme.text, 0.16) if primary else Theme.button_hover};
             }}
             """
         )
@@ -766,7 +773,7 @@ class BrowserTab(QWebEngineView):
             )
             if self._shell is not None and hasattr(self._shell, "clip_to_note"):
                 menu.addAction(
-                    "📌  Nota kaydet",
+                    "✎  Nota kaydet",
                     lambda: self._shell.clip_to_note(selected_text),
                 )
 
@@ -1017,6 +1024,13 @@ class BrowserWindow(QMainWindow):
             for key, enabled in defaults.items()
         }
         self.mouse_gestures.enabled = self.power_ux["mouse_gestures"]
+        raw_shell_layout = state.get("shell_layout_by_profile", {})
+        self._shell_layout_by_profile = (
+            raw_shell_layout if isinstance(raw_shell_layout, dict) else {}
+        )
+        self.shell_layout = self._normalize_shell_layout(
+            self._shell_layout_by_profile.get(self.profile_name)
+        )
         self.custom_nav_items = [
             (str(icon), str(text))
             for icon, text in state.get("custom_nav_items", [])
@@ -1090,6 +1104,7 @@ class BrowserWindow(QMainWindow):
                 }
             },
             self._power_ux_by_profile | {self.profile_name: self.power_ux},
+            self._shell_layout_by_profile | {self.profile_name: self.shell_layout},
         )
 
     def _load_web_panel_state(self, state):
@@ -1134,6 +1149,127 @@ class BrowserWindow(QMainWindow):
         if key == "sidebar_panels" and not self.power_ux[key]:
             self.close_sidebar_web_panel()
         self._save_ui_state()
+
+    # F7 ozellestirme merkezi: profil bazli kabuk duzeni varsayilanlari.
+    DEFAULT_SHELL_LAYOUT = {
+        "toolbar_actions": ["fan", "todo", "history", "theme"],
+        "left_sections": {"nav": True, "web_panels": True, "shortcuts": True},
+        "right_sections": {"workspaces": True, "tab_groups": True},
+        "newtab_sections": {"search": True, "quick": True, "webmap": True},
+    }
+
+    def _shell_actions(self):
+        """Toolbar'a alinabilir eylem kaydi; dict sirasi ⋯ menu sirasini belirler.
+
+        Adres cubugu, profil cipi ve panel toggle'lari bilincli olarak burada
+        degildir — kabuktan kaldirilamazlar.
+        """
+        return {
+            "fan": ("❖", "Sekme yelpazesi", self.toggle_fan_mode),
+            "todo": ("✓", "Görevler", self.toggle_todo_widget),
+            "history": ("◷", "Geçmiş", lambda: self.open_internal_page("history")),
+            "theme": ("◐", "Açık/koyu tema", self.toggle_theme_mode),
+            "downloads": ("⬇", "İndirilenler", lambda: self.open_internal_page("downloads")),
+            "tasks": ("▦", "Görev Tahtası", lambda: self.open_internal_page("tasks")),
+            "notes": ("✎", "Notlar", lambda: self.open_internal_page("notes")),
+            "split": ("↔", "Bölünmüş görünüm", self.toggle_split_view),
+            "pip": ("▣", "Video küçük pencere", self.open_video_popout),
+            "shot": ("▧", "Ekran görüntüsünü kaydet", self.capture_screenshot),
+            "shot-copy": ("▧", "Ekran görüntüsünü panoya kopyala", self.copy_screenshot),
+            "shot-pdf": ("▧", "Tam sayfayı PDF kaydet", self.capture_full_page),
+            "devtools": ("⌁", "Geliştirici araçları", self.open_devtools),
+            "snippets": ("⌘", "Snippet kütüphanesi", self.open_snippet_library),
+            "ua": ("◎", "User-agent", self.open_user_agent_dialog),
+            "requests": ("↗", "Ağ istekleri", self.open_request_capture),
+        }
+
+    def _normalize_shell_layout(self, raw):
+        """Profil kaydini dogrular: bilinmeyen anahtarlar atilir, eksikler varsayilana iner."""
+        layout = {
+            "toolbar_actions": list(self.DEFAULT_SHELL_LAYOUT["toolbar_actions"]),
+            "left_sections": dict(self.DEFAULT_SHELL_LAYOUT["left_sections"]),
+            "right_sections": dict(self.DEFAULT_SHELL_LAYOUT["right_sections"]),
+            "newtab_sections": dict(self.DEFAULT_SHELL_LAYOUT["newtab_sections"]),
+        }
+        if not isinstance(raw, dict):
+            return layout
+        known_actions = self._shell_actions()
+        raw_toolbar = raw.get("toolbar_actions")
+        if isinstance(raw_toolbar, list):
+            deduped = []
+            for key in raw_toolbar:
+                if isinstance(key, str) and key in known_actions and key not in deduped:
+                    deduped.append(key)
+            layout["toolbar_actions"] = deduped
+        for group in ("left_sections", "right_sections", "newtab_sections"):
+            raw_group = raw.get(group)
+            if isinstance(raw_group, dict):
+                for section in layout[group]:
+                    if isinstance(raw_group.get(section), bool):
+                        layout[group][section] = raw_group[section]
+        return layout
+
+    def _store_shell_layout(self):
+        self._shell_layout_by_profile[self.profile_name] = {
+            "toolbar_actions": list(self.shell_layout["toolbar_actions"]),
+            "left_sections": dict(self.shell_layout["left_sections"]),
+            "right_sections": dict(self.shell_layout["right_sections"]),
+            "newtab_sections": dict(self.shell_layout["newtab_sections"]),
+        }
+        self._save_ui_state()
+
+    def move_shell_action(self, key, to_toolbar):
+        """Eylemi toolbar ile ⋯ menusu arasinda tasir."""
+        if key not in self._shell_actions():
+            return False
+        actions = self.shell_layout["toolbar_actions"]
+        if to_toolbar and key not in actions:
+            actions.append(key)
+        elif not to_toolbar and key in actions:
+            actions.remove(key)
+        else:
+            return False
+        self._store_shell_layout()
+        return True
+
+    def shift_shell_action(self, key, delta):
+        """Toolbar'daki eylemi bir konum sola (-) veya saga (+) alir."""
+        actions = self.shell_layout["toolbar_actions"]
+        if key not in actions:
+            return False
+        index = actions.index(key)
+        target = index + (1 if delta > 0 else -1)
+        if not 0 <= target < len(actions):
+            return False
+        actions[index], actions[target] = actions[target], actions[index]
+        self._store_shell_layout()
+        return True
+
+    def toggle_shell_section(self, group, section):
+        sections = self.shell_layout.get(group)
+        if not isinstance(sections, dict) or section not in sections:
+            return False
+        sections[section] = not sections[section]
+        self._store_shell_layout()
+        return True
+
+    def _confirm_reset_shell_layout(self):
+        # Ayri metod: smoke test modal dialogu monkeypatch'leyebilsin.
+        return ConfirmDialog.ask(
+            self,
+            "Düzeni sıfırla",
+            f"'{self.profile_name}' profilinin toolbar, panel ve başlangıç ekranı düzeni "
+            "TabX varsayılanına dönecek. Notların, görevlerin ve kısayolların silinmez. "
+            "Devam edilsin mi?",
+            confirm_label="Sıfırla",
+        )
+
+    def reset_shell_layout(self):
+        if not self._confirm_reset_shell_layout():
+            return False
+        self.shell_layout = self._normalize_shell_layout(None)
+        self._store_shell_layout()
+        return True
 
     def _set_rail_button_active(self, btn, active):
         # F2.6: toolbar'daki panel toggle'lari — aktifken kalici mor zemin.
@@ -1266,7 +1402,7 @@ class BrowserWindow(QMainWindow):
                 selection-background-color: {Theme.purple};
             }}
             QLineEdit:focus {{
-                border: 1px solid #b7a7ff;
+                border: 1px solid {Theme.focus_ring};
                 background-color: {Theme.input};
             }}
             """
@@ -1281,15 +1417,16 @@ class BrowserWindow(QMainWindow):
         layout.addWidget(self._toolbar_separator())
 
         # Sayfa islemleri: sik kullanilanlar ikon olarak kalir, gerisi
-        # "⋯" menusune iner — toolbar kalabaligini azaltir.
-        page_actions = [
-            ("❖", "Sekme yelpazesi", self.toggle_fan_mode),
-            ("✓", "Görevler", self.toggle_todo_widget),
-            ("◷", "Geçmiş", lambda: self.open_internal_page("history")),
-            ("◐", "Açık/koyu tema", self.toggle_theme_mode),
-        ]
-        for label, tooltip, callback in page_actions:
-            btn = self._icon_button(label, tooltip)
+        # "⋯" menusune iner — toolbar kalabaligini azaltir. Hangi eylemin
+        # toolbar'da hangisinin menude oldugu profil bazli shell_layout'tan
+        # gelir; tabx://customize uzerinden duzenlenir.
+        shell_actions = self._shell_actions()
+        for key in self.shell_layout["toolbar_actions"]:
+            action = shell_actions.get(key)
+            if action is None:
+                continue
+            glyph, tooltip, callback = action
+            btn = self._icon_button(glyph, tooltip)
             btn.clicked.connect(lambda checked=False, action=callback: action())
             layout.addWidget(btn)
 
@@ -1297,19 +1434,12 @@ class BrowserWindow(QMainWindow):
         more_menu = QMenu(more_btn)
         more_menu.setStyleSheet(self._menu_style())
         more_menu.addAction("⇅  Sekmeleri üste/alta al", self.toggle_tab_position)
-        more_menu.addAction("⬇  İndirilenler", lambda: self.open_internal_page("downloads"))
-        more_menu.addAction("▦  Görev Tahtası", lambda: self.open_internal_page("tasks"))
-        more_menu.addAction("✎  Notlar", lambda: self.open_internal_page("notes"))
-        more_menu.addAction("↔  Bölünmüş görünüm", self.toggle_split_view)
-        more_menu.addAction("▣  Video küçük pencere", self.open_video_popout)
-        more_menu.addAction("▧  Ekran görüntüsünü kaydet", self.capture_screenshot)
-        more_menu.addAction("▧  Ekran görüntüsünü panoya kopyala", self.copy_screenshot)
-        more_menu.addAction("▧  Tam sayfayı PDF kaydet", self.capture_full_page)
+        for key, (glyph, label, callback) in shell_actions.items():
+            if key in self.shell_layout["toolbar_actions"]:
+                continue
+            more_menu.addAction(f"{glyph}  {label}", callback)
         more_menu.addSeparator()
-        more_menu.addAction("⌁  Geliştirici araçları", self.open_devtools)
-        more_menu.addAction("⌘  Snippet kütüphanesi", self.open_snippet_library)
-        more_menu.addAction("◎  User-agent", self.open_user_agent_dialog)
-        more_menu.addAction("↗  Ağ istekleri", self.open_request_capture)
+        more_menu.addAction("◧  Özelleştir", lambda: self.open_internal_page("customize"))
         more_menu.addAction("⚙  Ayarlar", lambda: self.open_internal_page("settings"))
         more_menu.addAction("◌  UI denetimi", lambda: self.open_internal_page("audit"))
         more_menu.addAction("?  Hakkında", lambda: self.open_internal_page("about"))
@@ -1464,56 +1594,67 @@ class BrowserWindow(QMainWindow):
         layout.addLayout(brand)
 
         layout.addSpacing(8)
-        self._add_sidebar_section(
-            layout,
-            "Gezinti",
-            [
-                ("⌂", "Ana sayfa", False, lambda: self.open_internal_page("newtab")),
-                ("⬇", "İndirilenler", False, lambda: self.open_internal_page("downloads")),
-                ("▦", "Görev Tahtası", False, lambda: self.open_internal_page("tasks")),
-                ("✎", "Notlar", False, lambda: self.open_internal_page("notes")),
-                ("☆", "Favoriler", False, lambda: self.open_internal_page("bookmarks")),
-                ("◷", "Geçmiş", False, lambda: self.open_internal_page("history")),
-                ("⚙", "Ayarlar", False, lambda: self.open_internal_page("settings")),
-                ("◌", "UI denetimi", False, lambda: self.open_internal_page("audit")),
-            ],
-        )
-        panels_title = QHBoxLayout()
-        panels_label = QLabel("Web panelleri")
-        panels_label.setStyleSheet(
-            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px; margin-top: 8px;"
-        )
-        panels_title.addWidget(panels_label)
-        panels_title.addStretch(1)
-        add_panel = self._icon_button("+", "Web paneli ekle")
-        add_panel.setFixedSize(24, 24)
-        add_panel.clicked.connect(self.prompt_add_web_panel)
-        panels_title.addWidget(add_panel)
-        layout.addLayout(panels_title)
-        self.web_panels_layout = QVBoxLayout()
-        self.web_panels_layout.setContentsMargins(0, 0, 0, 0)
-        self.web_panels_layout.setSpacing(2)
-        layout.addLayout(self.web_panels_layout)
-        self._render_web_panels()
+        # F7: bolumler profil bazli shell_layout'a gore kurulur; kapali bolum
+        # panelden kalkar, verisi korunur (tabx://customize'dan yonetilir).
+        left_sections = self.shell_layout["left_sections"]
+        if left_sections.get("nav", True):
+            self._add_sidebar_section(
+                layout,
+                "Gezinti",
+                [
+                    ("⌂", "Ana sayfa", False, lambda: self.open_internal_page("newtab")),
+                    ("⬇", "İndirilenler", False, lambda: self.open_internal_page("downloads")),
+                    ("▦", "Görev Tahtası", False, lambda: self.open_internal_page("tasks")),
+                    ("✎", "Notlar", False, lambda: self.open_internal_page("notes")),
+                    ("☆", "Favoriler", False, lambda: self.open_internal_page("bookmarks")),
+                    ("◷", "Geçmiş", False, lambda: self.open_internal_page("history")),
+                    ("◧", "Özelleştir", False, lambda: self.open_internal_page("customize")),
+                    ("⚙", "Ayarlar", False, lambda: self.open_internal_page("settings")),
+                    ("◌", "UI denetimi", False, lambda: self.open_internal_page("audit")),
+                ],
+            )
+        if left_sections.get("web_panels", True):
+            panels_title = QHBoxLayout()
+            panels_label = QLabel("Web panelleri")
+            panels_label.setStyleSheet(
+                f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px; margin-top: 8px;"
+            )
+            panels_title.addWidget(panels_label)
+            panels_title.addStretch(1)
+            add_panel = self._icon_button("+", "Web paneli ekle")
+            add_panel.setFixedSize(24, 24)
+            add_panel.clicked.connect(self.prompt_add_web_panel)
+            panels_title.addWidget(add_panel)
+            layout.addLayout(panels_title)
+            self.web_panels_layout = QVBoxLayout()
+            self.web_panels_layout.setContentsMargins(0, 0, 0, 0)
+            self.web_panels_layout.setSpacing(2)
+            layout.addLayout(self.web_panels_layout)
+            self._render_web_panels()
+        else:
+            self.web_panels_layout = None
 
-        custom_title = QHBoxLayout()
-        custom_label = QLabel("Özel kısayollar")
-        custom_label.setStyleSheet(
-            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px; margin-top: 8px;"
-        )
-        custom_title.addWidget(custom_label)
-        custom_title.addStretch(1)
-        add_shortcut = self._icon_button("+", "Kısayol ekle")
-        add_shortcut.setFixedSize(24, 24)
-        add_shortcut.clicked.connect(self.add_custom_shortcut)
-        custom_title.addWidget(add_shortcut)
-        layout.addLayout(custom_title)
+        if left_sections.get("shortcuts", True):
+            custom_title = QHBoxLayout()
+            custom_label = QLabel("Özel kısayollar")
+            custom_label.setStyleSheet(
+                f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px; margin-top: 8px;"
+            )
+            custom_title.addWidget(custom_label)
+            custom_title.addStretch(1)
+            add_shortcut = self._icon_button("+", "Kısayol ekle")
+            add_shortcut.setFixedSize(24, 24)
+            add_shortcut.clicked.connect(self.add_custom_shortcut)
+            custom_title.addWidget(add_shortcut)
+            layout.addLayout(custom_title)
 
-        self.custom_nav_layout = QVBoxLayout()
-        self.custom_nav_layout.setContentsMargins(0, 0, 0, 0)
-        self.custom_nav_layout.setSpacing(2)
-        layout.addLayout(self.custom_nav_layout)
-        self._render_custom_nav_items()
+            self.custom_nav_layout = QVBoxLayout()
+            self.custom_nav_layout.setContentsMargins(0, 0, 0, 0)
+            self.custom_nav_layout.setSpacing(2)
+            layout.addLayout(self.custom_nav_layout)
+            self._render_custom_nav_items()
+        else:
+            self.custom_nav_layout = None
 
         layout.addStretch(1)
         return sidebar
@@ -1534,58 +1675,61 @@ class BrowserWindow(QMainWindow):
         layout.setContentsMargins(16, 18, 16, 18)
         layout.setSpacing(12)
 
+        # F7: bolumler profil bazli shell_layout'a gore kurulur; kapatma
+        # butonu bolumlerden bagimsiz olarak her zaman ust satirdadir.
+        right_sections = self.shell_layout["right_sections"]
         ws_header = QHBoxLayout()
-        ws_title = QLabel("Çalışma alanları")
-        ws_title.setStyleSheet(
-            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px;"
-        )
-        ws_header.addWidget(ws_title)
-        ws_header.addStretch(1)
-        ws_add = self._icon_button("+", "Çalışma alanı ekle")
-        ws_add.setFixedSize(24, 24)
-        ws_add.clicked.connect(lambda checked=False: self.add_workspace())
-        ws_header.addWidget(ws_add)
+        if right_sections.get("workspaces", True):
+            ws_title = QLabel("Çalışma alanları")
+            ws_title.setStyleSheet(
+                f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px;"
+            )
+            ws_header.addWidget(ws_title)
+            ws_header.addStretch(1)
+            ws_add = self._icon_button("+", "Çalışma alanı ekle")
+            ws_add.setFixedSize(24, 24)
+            ws_add.clicked.connect(lambda checked=False: self.add_workspace())
+            ws_header.addWidget(ws_add)
+        else:
+            ws_header.addStretch(1)
         close = self._icon_button("×", "Sağ paneli kapat")
         close.setFixedSize(24, 24)
         close.clicked.connect(lambda checked=False: self.toggle_right_sidebar(False))
         ws_header.addWidget(close)
         layout.addLayout(ws_header)
 
-        self.workspace_layout = QVBoxLayout()
-        self.workspace_layout.setContentsMargins(0, 0, 0, 0)
-        self.workspace_layout.setSpacing(6)
-        layout.addLayout(self.workspace_layout)
-        self._render_workspaces()
+        if right_sections.get("workspaces", True):
+            self.workspace_layout = QVBoxLayout()
+            self.workspace_layout.setContentsMargins(0, 0, 0, 0)
+            self.workspace_layout.setSpacing(6)
+            layout.addLayout(self.workspace_layout)
+            self._render_workspaces()
+        else:
+            self.workspace_layout = None
 
-        header = QHBoxLayout()
-        title = QLabel("Sekme grupları")
-        title.setStyleSheet(
-            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px;"
-        )
-        header.addWidget(title)
-        header.addStretch(1)
-        add = self._icon_button("+", "Grup ekle")
-        add.setFixedSize(24, 24)
-        add.clicked.connect(self.add_tab_group)
-        header.addWidget(add)
-        layout.addLayout(header)
+        if right_sections.get("tab_groups", True):
+            header = QHBoxLayout()
+            title = QLabel("Sekme grupları")
+            title.setStyleSheet(
+                f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px;"
+            )
+            header.addWidget(title)
+            header.addStretch(1)
+            add = self._icon_button("+", "Grup ekle")
+            add.setFixedSize(24, 24)
+            add.clicked.connect(self.add_tab_group)
+            header.addWidget(add)
+            layout.addLayout(header)
 
-        self.tab_groups_layout = QVBoxLayout()
-        self.tab_groups_layout.setContentsMargins(0, 0, 0, 0)
-        self.tab_groups_layout.setSpacing(2)
-        layout.addLayout(self.tab_groups_layout)
-        self._render_tab_groups()
+            self.tab_groups_layout = QVBoxLayout()
+            self.tab_groups_layout.setContentsMargins(0, 0, 0, 0)
+            self.tab_groups_layout.setSpacing(2)
+            layout.addLayout(self.tab_groups_layout)
+            self._render_tab_groups()
+        else:
+            self.tab_groups_layout = None
 
         layout.addStretch(1)
-        activity = QLabel("Son aktiviteler")
-        activity.setStyleSheet(
-            f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px;"
-        )
-        layout.addWidget(activity)
-        for item in ["TabX - yeni görsel kabuk", "GitHub oturumu", "Vaha.org"]:
-            line = QLabel(item)
-            line.setStyleSheet(f"font-size: 12px; color: {Theme.muted}; padding: 3px 0;")
-            layout.addWidget(line)
 
         return sidebar
 
@@ -1800,6 +1944,7 @@ class BrowserWindow(QMainWindow):
             PaletteCommand("İndirilenler", "Gezinme", lambda: self.open_internal_page("downloads")),
             PaletteCommand("Görev tahtası", "Üretkenlik", lambda: self.open_internal_page("tasks")),
             PaletteCommand("Notlar", "Üretkenlik", lambda: self.open_internal_page("notes")),
+            PaletteCommand("Özelleştirme merkezi", "Görünüm", lambda: self.open_internal_page("customize")),
             PaletteCommand("Ayarlar", "Görünüm", lambda: self.open_internal_page("settings")),
             PaletteCommand("UI denetimi", "Görünüm", lambda: self.open_internal_page("audit")),
             PaletteCommand("Açık/koyu tema", "Görünüm", self.toggle_theme_mode),
@@ -2096,6 +2241,10 @@ class BrowserWindow(QMainWindow):
             for key, enabled in power_ux_defaults.items()
         }
         self.mouse_gestures.enabled = self.power_ux["mouse_gestures"]
+        previous_shell_layout = self.shell_layout
+        self.shell_layout = self._normalize_shell_layout(
+            self._shell_layout_by_profile.get(name)
+        )
         self._save_ui_state()
         self._setup_web_profile()
         self._reset_tabs()
@@ -2103,6 +2252,9 @@ class BrowserWindow(QMainWindow):
         self._render_workspaces()
         self._render_web_panels()
         self._update_profile_chip()
+        # Hedef profilin kabuk duzeni farkliysa toolbar/paneller yeniden kurulur.
+        if self.shell_layout != previous_shell_layout:
+            self._rebuild_visual_shell()
 
     def add_workspace(self):
         name, ok = TextInputDialog.get_text(self, "Yeni çalışma alanı", "Alan adı")
@@ -2160,7 +2312,7 @@ class BrowserWindow(QMainWindow):
         Qt'de hazir flow layout olmadigi icin cipler tahmini genislikle satirlara
         elle sarilir.
         """
-        if not hasattr(self, "workspace_layout"):
+        if getattr(self, "workspace_layout", None) is None:
             return
         self._clear_layout(self.workspace_layout)
         available = self.RIGHT_SIDEBAR_WIDTH - 40
@@ -2272,7 +2424,7 @@ class BrowserWindow(QMainWindow):
             self._render_custom_nav_items()
 
     def _render_custom_nav_items(self):
-        if not hasattr(self, "custom_nav_layout"):
+        if getattr(self, "custom_nav_layout", None) is None:
             return
         self._clear_layout(self.custom_nav_layout)
         if not self.custom_nav_items:
@@ -2321,7 +2473,7 @@ class BrowserWindow(QMainWindow):
             self.custom_nav_layout.addWidget(row)
 
     def _render_web_panels(self):
-        if not hasattr(self, "web_panels_layout"):
+        if getattr(self, "web_panels_layout", None) is None:
             return
         self._clear_layout(self.web_panels_layout)
         for index, (title, url) in enumerate(self.web_panels):
@@ -2515,7 +2667,7 @@ class BrowserWindow(QMainWindow):
 
     def _render_tab_groups(self):
         """F2.6: kart yerine daraltilabilir bolum — chevron + hover-reveal eylemler."""
-        if not hasattr(self, "tab_groups_layout"):
+        if getattr(self, "tab_groups_layout", None) is None:
             return
         self._clear_layout(self.tab_groups_layout)
         for group_index, (group_name, items) in enumerate(self.tab_groups):
@@ -3087,7 +3239,7 @@ class BrowserWindow(QMainWindow):
         self._load_internal_page(self.current_view, page_key)
 
     INTERNAL_PAGES = {
-        "newtab", "settings", "audit", "about", "history", "bookmarks", "downloads", "tasks", "notes", "error",
+        "newtab", "settings", "customize", "audit", "about", "history", "bookmarks", "downloads", "tasks", "notes", "error",
     }
 
     def _load_internal_page(self, view, page_key):
@@ -3140,6 +3292,7 @@ class BrowserWindow(QMainWindow):
         return {
             "newtab": "Yeni Sekme",
             "settings": "Ayarlar",
+            "customize": "Özelleştir",
             "audit": "UI Denetimi",
             "about": "Hakkında",
             "history": "Geçmiş",
@@ -3153,6 +3306,8 @@ class BrowserWindow(QMainWindow):
     def _internal_page_html(self, page_key):
         if page_key == "settings":
             return self._settings_page_html()
+        if page_key == "customize":
+            return self._customize_page_html()
         if page_key == "audit":
             return self._audit_page_html()
         if page_key == "about":
@@ -3249,6 +3404,44 @@ class BrowserWindow(QMainWindow):
             if index.isdigit():
                 self.remove_speed_dial(int(index))
             self._load_internal_page(view, "newtab")
+            return
+        if key == "customize" and action:
+            if action == "module":
+                module = query.queryItemValue("key")
+                if module in self.power_ux:
+                    self.toggle_power_ux(module)
+                self._load_internal_page(view, "customize")
+                return
+            if action == "reset":
+                # Modal onay + kabuk yikimi navigasyon callback'inde yapilamaz.
+                def _run():
+                    if self.reset_shell_layout():
+                        self._rebuild_visual_shell()
+
+                QTimer.singleShot(0, _run)
+                return
+            changed = False
+            needs_rebuild = True
+            if action == "toolbar-move":
+                dest = query.queryItemValue("dest")
+                changed = self.move_shell_action(
+                    query.queryItemValue("key"), dest == "toolbar"
+                )
+            elif action == "toolbar-shift":
+                direction = query.queryItemValue("dir")
+                changed = self.shift_shell_action(
+                    query.queryItemValue("key"), -1 if direction == "left" else 1
+                )
+            elif action == "section":
+                group = query.queryItemValue("group")
+                changed = self.toggle_shell_section(group, query.queryItemValue("key"))
+                # Newtab bolumleri kabugu degistirmez; sayfa yeniden yuklenir.
+                needs_rebuild = group in {"left_sections", "right_sections"}
+            if changed and needs_rebuild:
+                # Kabuk yeniden kurulunca bu view yok olur; oturumdan geri gelir.
+                QTimer.singleShot(0, self._rebuild_visual_shell)
+            else:
+                self._load_internal_page(view, "customize")
             return
         if key == "audit" and action == "open":
             page_key = query.queryItemValue("page").strip()
@@ -3406,8 +3599,9 @@ class BrowserWindow(QMainWindow):
               --muted: __MUTED__;
               --purple: __PURPLE__;
               --blue: __BLUE__;
-              --green: #18a058;
-              --amber: #b7791f;
+              --green: __SUCCESS__;
+              --danger: __DANGER__;
+              --motion-fast: __MOTION_FAST__ms;
             }
             * { box-sizing: border-box; }
             body {
@@ -3485,11 +3679,17 @@ class BrowserWindow(QMainWindow):
               color: var(--muted);
               font-size: 12px;
               font-weight: 750;
+              transition: color var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
+            }
+            a.pill:hover, a.pill:focus-visible {
+              color: var(--purple);
+              border-color: var(--purple);
+              outline: none;
             }
             .status {
               color: var(--green);
-              background: rgba(24,160,88,.08);
-              border-color: rgba(24,160,88,.18);
+              background: color-mix(in srgb, var(--green) 9%, transparent);
+              border-color: color-mix(in srgb, var(--green) 22%, transparent);
             }
             .switch-list { margin-top: 14px; }
             .switch-list a + a { border-top: 1px solid var(--line); }
@@ -3503,6 +3703,11 @@ class BrowserWindow(QMainWindow):
               color: var(--text);
               font-size: 13px;
               font-weight: 650;
+              transition: color var(--motion-fast) ease-out;
+            }
+            .switch-row:hover, .switch-row:focus-visible {
+              color: var(--purple);
+              outline: none;
             }
             .switch {
               flex: none;
@@ -3539,6 +3744,11 @@ class BrowserWindow(QMainWindow):
             .replace("__BLUE__", Theme.blue)
             .replace("__PANEL__", Theme.panel)
             .replace("__BUTTON__", Theme.button)
+            .replace("__SUCCESS__", Theme.success)
+            .replace("__DANGER__", Theme.danger)
+            # Reduced-motion tercihi ic sayfalara da uygulanir: kapaliyken
+            # gecis suresi 0'a iner ve CSS transition'lar aninda calisir.
+            .replace("__MOTION_FAST__", str(Motion.FAST if Motion.enabled else 0))
         )
 
     def _switch_row_html(self, label, enabled, href):
@@ -3549,6 +3759,279 @@ class BrowserWindow(QMainWindow):
             f"<span>{label}</span>"
             f'<span class="switch {state}"><span class="knob"></span></span></a>'
         )
+
+    def _customize_page_html(self):
+        """F7 ozellestirme merkezi: kabuk haritasi + profil bazli duzen kartlari."""
+        actions = self._shell_actions()
+        toolbar_keys = self.shell_layout["toolbar_actions"]
+
+        def _toolbar_row(position, key):
+            glyph, label, _callback = actions[key]
+            left_op = (
+                f'<a class="op" href="tabx://customize/toolbar-shift?key={key}&dir=left" title="Sola al">←</a>'
+                if position > 0
+                else '<span class="op dim">←</span>'
+            )
+            right_op = (
+                f'<a class="op" href="tabx://customize/toolbar-shift?key={key}&dir=right" title="Sağa al">→</a>'
+                if position < len(toolbar_keys) - 1
+                else '<span class="op dim">→</span>'
+            )
+            return (
+                '<div class="crow">'
+                f'<span class="cglyph">{glyph}</span>'
+                f'<span class="cname">{html_module.escape(label)}</span>'
+                f'<span class="cops">{left_op}{right_op}'
+                f'<a class="op wide" href="tabx://customize/toolbar-move?key={key}&dest=menu">Menüye taşı</a>'
+                "</span></div>"
+            )
+
+        def _menu_row(key):
+            glyph, label, _callback = actions[key]
+            return (
+                '<div class="crow">'
+                f'<span class="cglyph">{glyph}</span>'
+                f'<span class="cname">{html_module.escape(label)}</span>'
+                f'<span class="cops"><a class="op wide" href="tabx://customize/toolbar-move?key={key}&dest=toolbar">Toolbar\'a al</a></span>'
+                "</div>"
+            )
+
+        toolbar_rows = "".join(
+            _toolbar_row(position, key) for position, key in enumerate(toolbar_keys)
+        ) or '<p class="empty-note">Toolbar\'da taşınabilir eylem yok; aşağıdan ekleyebilirsin.</p>'
+        menu_rows = "".join(_menu_row(key) for key in actions if key not in toolbar_keys) or (
+            '<p class="empty-note">Tüm eylemler toolbar\'da.</p>'
+        )
+
+        left_sections = self.shell_layout["left_sections"]
+        right_sections = self.shell_layout["right_sections"]
+        panel_switches = "".join(
+            self._switch_row_html(
+                label, left_sections[section],
+                f"tabx://customize/section?group=left_sections&key={section}",
+            )
+            for section, label in (
+                ("nav", "Gezinti bağlantıları"),
+                ("web_panels", "Web panelleri"),
+                ("shortcuts", "Özel kısayollar"),
+            )
+        )
+        right_switches = "".join(
+            self._switch_row_html(
+                label, right_sections[section],
+                f"tabx://customize/section?group=right_sections&key={section}",
+            )
+            for section, label in (
+                ("workspaces", "Çalışma alanları"),
+                ("tab_groups", "Sekme grupları"),
+            )
+        )
+        module_switches = "".join(
+            self._switch_row_html(
+                label, self.power_ux[module],
+                f"tabx://customize/module?key={module}",
+            )
+            for module, label in (
+                ("split_view", "Bölünmüş görünüm"),
+                ("video_popout", "Video küçük pencere"),
+                ("sidebar_panels", "Web panelleri"),
+                ("mouse_gestures", "Fare hareketleri"),
+                ("screenshots", "Ekran görüntüsü"),
+                ("tab_islands", "Sekme adaları"),
+            )
+        )
+        newtab_sections = self.shell_layout["newtab_sections"]
+        newtab_switches = "".join(
+            self._switch_row_html(
+                label, newtab_sections[section],
+                f"tabx://customize/section?group=newtab_sections&key={section}",
+            )
+            for section, label in (
+                ("search", "Arama kutusu"),
+                ("quick", "Hızlı erişim kartları"),
+                ("webmap", "Web Haritası"),
+            )
+        )
+        toolbar_glyphs = "".join(
+            f"<span>{actions[key][0]}</span>" for key in toolbar_keys
+        )
+        customize_css = """
+            .customize-layout {
+              display: grid;
+              grid-template-columns: 280px minmax(0, 1fr);
+              gap: 16px;
+              align-items: start;
+            }
+            @media (max-width: 860px) { .customize-layout { grid-template-columns: 1fr; } }
+            .shellmap { position: sticky; top: 16px; }
+            .mini {
+              border: 1px solid var(--line);
+              border-radius: 12px;
+              overflow: hidden;
+              background: var(--bg);
+              margin-top: 12px;
+              font-size: 10px;
+              user-select: none;
+            }
+            .zone { cursor: pointer; transition: background var(--motion-fast) ease-out; }
+            .zone:hover { background: __PURPLE_SOFT__; }
+            .mini-toolbar {
+              display: flex; gap: 5px; align-items: center;
+              padding: 6px 8px;
+              border-bottom: 1px solid var(--line);
+              color: var(--muted); font-weight: 800;
+            }
+            .mini-address { flex: 1; height: 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); }
+            .mini-body { display: flex; min-height: 90px; }
+            .mini-side { width: 40px; flex: none; display: flex; flex-direction: column; gap: 4px; padding: 6px 5px; }
+            .mini-side.l { border-right: 1px solid var(--line); }
+            .mini-side.r { border-left: 1px solid var(--line); }
+            .mini-row { height: 7px; border-radius: 4px; background: __BUTTON__; border: 1px solid var(--line); }
+            .mini-page { flex: 1; display: grid; align-content: center; justify-items: center; gap: 6px; padding: 8px; }
+            .mini-search { width: 70%; height: 11px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); }
+            .legend { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 2px; }
+            .legend a {
+              display: block; padding: 7px 10px;
+              border-radius: 8px;
+              color: var(--text); text-decoration: none;
+              font-size: 13px; font-weight: 700;
+              transition: background var(--motion-fast) ease-out, color var(--motion-fast) ease-out;
+            }
+            .legend a:hover { background: __PURPLE_SOFT__; color: var(--purple); }
+            .subhead {
+              margin: 14px 0 2px;
+              color: __SUBTLE__;
+              font-size: 11px; font-weight: 800;
+              text-transform: uppercase; letter-spacing: 0.4px;
+            }
+            .crow {
+              display: flex; align-items: center; gap: 10px;
+              padding: 8px 0;
+              border-top: 1px solid var(--line);
+              font-size: 13px; font-weight: 650;
+            }
+            .cglyph {
+              width: 26px; height: 26px; flex: none;
+              display: grid; place-items: center;
+              border-radius: 8px;
+              background: __BUTTON__;
+              color: var(--muted);
+              font-size: 13px; font-weight: 800;
+            }
+            .cname { flex: 1; min-width: 0; }
+            .cops { display: flex; gap: 6px; align-items: center; }
+            .op {
+              padding: 4px 8px;
+              border: 1px solid var(--line);
+              border-radius: 8px;
+              color: var(--muted);
+              text-decoration: none;
+              font-size: 11px; font-weight: 800;
+              transition: color var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
+            }
+            a.op:hover { color: var(--purple); border-color: var(--purple); }
+            .op.dim { opacity: .35; }
+            .empty-note { color: var(--muted); font-size: 12px; }
+            .danger-line { border-color: var(--danger); color: var(--danger); }
+            a.danger-line:hover { color: var(--danger); border-color: var(--danger); background: none; }
+        """.replace("__PURPLE_SOFT__", Theme.purple_soft).replace(
+            "__BUTTON__", Theme.button
+        ).replace("__SUBTLE__", Theme.subtle)
+        return f"""
+        <!doctype html>
+        <html lang="tr">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Özelleştir</title>
+          <style>{self._internal_page_base_css()}{customize_css}</style>
+        </head>
+        <body>
+          <main class="wide" style="width: min(1080px, calc(100vw - 64px));">
+            <p class="eyebrow">F7 · Power UX</p>
+            <h1>Özelleştirme Merkezi</h1>
+            <p class="subtitle">'{html_module.escape(self.profile_name)}' profilinin kabuk düzeni. Değişiklikler anında kaydedilir; diğer profiller etkilenmez.</p>
+            <div class="customize-layout">
+              <aside class="card shellmap">
+                <h2>Kabuk haritası</h2>
+                <p>Tarayıcının düzenlenebilir bölgeleri. Tıklayınca ilgili karta gider.</p>
+                <div class="mini">
+                  <div class="mini-toolbar zone" data-target="card-toolbar">
+                    <span>☰</span><span>←</span><span>↻</span>
+                    <span class="mini-address"></span>
+                    {toolbar_glyphs}<span>⋯</span><span>▦</span>
+                  </div>
+                  <div class="mini-body">
+                    <div class="mini-side l zone" data-target="card-panels">
+                      <span class="mini-row"></span><span class="mini-row"></span><span class="mini-row" style="width:70%"></span>
+                    </div>
+                    <div class="mini-page zone" data-target="card-newtab">
+                      <span class="mini-search"></span>
+                    </div>
+                    <div class="mini-side r zone" data-target="card-panels">
+                      <span class="mini-row"></span><span class="mini-row" style="width:80%"></span>
+                    </div>
+                  </div>
+                </div>
+                <ul class="legend">
+                  <li><a href="#" data-target="card-toolbar">Araç çubuğu</a></li>
+                  <li><a href="#" data-target="card-panels">Sol &amp; sağ panel</a></li>
+                  <li><a href="#" data-target="card-modules">Modüller</a></li>
+                  <li><a href="#" data-target="card-newtab">Başlangıç ekranı</a></li>
+                </ul>
+              </aside>
+              <section style="display: grid; gap: 16px; min-width: 0;">
+                <article class="card" id="card-toolbar">
+                  <h2>Araç çubuğu</h2>
+                  <p>Eylemleri ←/→ ile sırala, az kullandıklarını ⋯ menüsüne indir. Adres çubuğu, profil çipi ve panel toggle'ları sabittir.</p>
+                  <p class="subhead">Toolbar'da görünür</p>
+                  {toolbar_rows}
+                  <p class="subhead">⋯ menüsünde</p>
+                  {menu_rows}
+                </article>
+                <article class="card" id="card-panels">
+                  <h2>Paneller</h2>
+                  <p>Kapalı bölüm panelden kalkar; verisi silinmez, tekrar açınca geri gelir.</p>
+                  <p class="subhead">Sol panel</p>
+                  <div class="switch-list">{panel_switches}</div>
+                  <p class="subhead">Sağ panel</p>
+                  <div class="switch-list">{right_switches}</div>
+                </article>
+                <article class="card" id="card-modules">
+                  <h2>Modüller</h2>
+                  <p>Kapalı modülün toolbar butonu ve menü girişi çalışmaz; erişim yerleşimi "Araç çubuğu" kartından yönetilir.</p>
+                  <div class="switch-list">{module_switches}</div>
+                </article>
+                <article class="card" id="card-newtab">
+                  <h2>Başlangıç ekranı</h2>
+                  <p>Yeni sekme bölümlerini aç/kapat; kapalı bölümün alanı diğerlerine dağılır.</p>
+                  <div class="switch-list">{newtab_switches}</div>
+                  <div class="pill-row">
+                    <a class="pill" href="tabx://newtab">Yeni sekmeyi aç →</a>
+                  </div>
+                </article>
+                <article class="card" id="card-reset">
+                  <h2>Düzeni sıfırla</h2>
+                  <p>'{html_module.escape(self.profile_name)}' profilinin toolbar, panel ve başlangıç ekranı düzenini TabX varsayılanına döndürür. Notların, görevlerin ve kısayolların silinmez.</p>
+                  <div class="pill-row">
+                    <a class="pill danger-line" href="tabx://customize/reset">Varsayılan düzene dön…</a>
+                  </div>
+                </article>
+              </section>
+            </div>
+          </main>
+          <script>
+            document.querySelectorAll('[data-target]').forEach(function (el) {{
+              el.addEventListener('click', function (event) {{
+                event.preventDefault();
+                var card = document.getElementById(el.dataset.target);
+                if (card) card.scrollIntoView({{ behavior: {'"auto"' if not Motion.enabled else '"smooth"'}, block: 'start' }});
+              }});
+            }});
+          </script>
+        </body>
+        </html>
+        """
 
     def _settings_page_html(self):
         theme_label = "Koyu tema aktif" if self.theme_mode == "dark" else "Açık tema aktif"
@@ -3689,8 +4172,11 @@ class BrowserWindow(QMainWindow):
               </article>
               <article class="card">
                 <h2>Power UX</h2>
-                <p>Bu profil için F7 modüllerini aç veya kapat. Web panelleri, hareketler ve sekme adaları aktif çalışma alanında uygulanır.</p>
+                <p>Bu profil için F7 modüllerini aç veya kapat. Toolbar, panel ve başlangıç ekranı düzeni özelleştirme merkezindedir.</p>
                 <div class="switch-list">{power_ux_switches}</div>
+                <div class="pill-row">
+                  <a class="pill" style="text-decoration:none;" href="tabx://customize">Özelleştirme merkezi →</a>
+                </div>
               </article>
             </section>
           </main>
@@ -3703,6 +4189,7 @@ class BrowserWindow(QMainWindow):
         page_targets = [
             ("Başlangıç", "Hızlı erişim, arama ve hız kadranları.", "newtab"),
             ("Ayarlar", "Profil tercihleri, gizlilik ve modül anahtarları.", "settings"),
+            ("Özelleştir", "Toolbar, panel ve başlangıç ekranı düzeni.", "customize"),
             ("Geçmiş", "Liste yoğunluğu, filtreleme ve satır hiyerarşisi.", "history"),
             ("Favoriler", "Kayıt yönetimi ve boş durum davranışı.", "bookmarks"),
             ("İndirilenler", "Durumlar, eylemler ve geri bildirimler.", "downloads"),
@@ -3715,7 +4202,7 @@ class BrowserWindow(QMainWindow):
             ("Komut paleti", "Arama, sıralama ve klavye akışı.", "palette"),
             ("Sekme yelpazesi", "Sekme geçişi ve yoğun görünüm.", "fan"),
             ("Bölünmüş görünüm", "İki sayfanın yerleşimi ve odak yönetimi.", "split"),
-            ("Geliştirici araçları", "Alt dock, boyut ve kapatma akışı.", "devtools"),
+            ("Geliştirici araçları", "Sağ dock, boyut ve kapatma akışı.", "devtools"),
         ]
         if self.web_panels:
             surface_targets.insert(
@@ -3865,7 +4352,7 @@ class BrowserWindow(QMainWindow):
               border-radius: 8px;
               padding: 4px 8px;
             }
-            .row a.action:hover { color: #c0392b; border-color: #c0392b; }
+            .row a.action:hover { color: var(--danger); border-color: var(--danger); }
             .toolbar-row { display: flex; justify-content: flex-end; margin: 0 0 14px; }
             .toolbar-row a {
               color: var(--muted);
@@ -3876,7 +4363,7 @@ class BrowserWindow(QMainWindow):
               border-radius: 999px;
               padding: 8px 14px;
             }
-            .toolbar-row a:hover { color: #c0392b; border-color: #c0392b; }
+            .toolbar-row a:hover { color: var(--danger); border-color: var(--danger); }
             .empty { color: var(--muted); font-size: 14px; padding: 24px 4px; }
         """
 
@@ -4129,7 +4616,7 @@ class BrowserWindow(QMainWindow):
               padding: 6px 9px;
             }
             a.action:hover, .add-card:hover { color: var(--purple); border-color: var(--purple); }
-            a.danger:hover { color: #c0392b; border-color: #c0392b; }
+            a.danger:hover { color: var(--danger); border-color: var(--danger); }
             .add-card {
               display: inline-flex;
               margin-top: 12px;
@@ -4262,7 +4749,7 @@ class BrowserWindow(QMainWindow):
               padding: 7px 11px;
             }
             a.action:hover, .add-note:hover { color: var(--purple); border-color: var(--purple); }
-            a.danger:hover { color: #c0392b; border-color: #c0392b; }
+            a.danger:hover { color: var(--danger); border-color: var(--danger); }
             @media (max-width: 840px) {
               .notes-grid { grid-template-columns: 1fr; }
             }
@@ -4285,144 +4772,6 @@ class BrowserWindow(QMainWindow):
               <a class="add-note" href="tabx://notes/add">+ Not ekle</a>
             </div>
             <section class="notes-grid">{body}</section>
-          </main>
-        </body>
-        </html>
-        """
-
-    def _devtools_page_html(self):
-        rows = []
-        for snippet_id, title, kind, code, updated_at in self.snippets.all():
-            safe_title = html_module.escape(title)
-            safe_kind = html_module.escape(kind.upper())
-            safe_code = html_module.escape(code)
-            stamp = datetime.fromtimestamp(updated_at).strftime("%d.%m.%Y %H:%M")
-            rows.append(
-                f"""
-                <article class="snippet-card">
-                  <div class="snippet-head">
-                    <div>
-                      <span class="kind">{safe_kind}</span>
-                      <h2>{safe_title}</h2>
-                    </div>
-                    <span class="time">{stamp}</span>
-                  </div>
-                  <pre>{safe_code}</pre>
-                  <div class="snippet-actions">
-                    <a class="action" href="tabx://devtools/run?id={snippet_id}">Çalıştır</a>
-                    <a class="action danger" href="tabx://devtools/remove?id={snippet_id}">Sil</a>
-                  </div>
-                </article>
-                """
-            )
-        body = (
-            "\n".join(rows)
-            if rows
-            else '<p class="empty">Henüz snippet yok. JS veya CSS snippet ekleyerek başlayabilirsin.</p>'
-        )
-        devtools_css = """
-            main.wide { width: min(1080px, calc(100vw - 64px)); }
-            .devtools-toolbar {
-              display: flex;
-              justify-content: flex-end;
-              margin: 0 0 14px;
-            }
-            .snippet-grid {
-              display: grid;
-              grid-template-columns: repeat(2, minmax(0, 1fr));
-              gap: 14px;
-            }
-            .snippet-card {
-              border: 1px solid var(--line);
-              border-radius: 18px;
-              background: var(--card);
-              padding: 16px;
-              box-shadow: 0 16px 38px rgba(36, 43, 65, .06);
-            }
-            .snippet-head {
-              display: flex;
-              align-items: flex-start;
-              justify-content: space-between;
-              gap: 12px;
-              margin-bottom: 10px;
-            }
-            .snippet-head h2 {
-              margin: 5px 0 0;
-              font-size: 15px;
-              line-height: 1.25;
-              letter-spacing: 0;
-              overflow-wrap: anywhere;
-            }
-            .kind {
-              display: inline-flex;
-              border: 1px solid var(--line);
-              border-radius: 999px;
-              color: var(--purple);
-              background: __BUTTON__;
-              padding: 3px 7px;
-              font-size: 11px;
-              font-weight: 850;
-            }
-            .time {
-              flex: none;
-              color: var(--muted);
-              font-size: 12px;
-              white-space: nowrap;
-            }
-            .snippet-card pre {
-              max-height: 240px;
-              margin: 0;
-              overflow: auto;
-              white-space: pre-wrap;
-              overflow-wrap: anywhere;
-              border: 1px solid var(--line);
-              border-radius: 12px;
-              background: __BUTTON__;
-              color: var(--muted);
-              font-family: "SF Mono", Menlo, Consolas, monospace;
-              font-size: 12px;
-              line-height: 1.55;
-              padding: 12px;
-            }
-            .snippet-actions {
-              display: flex;
-              justify-content: flex-end;
-              gap: 8px;
-              margin-top: 14px;
-            }
-            a.action, .add-snippet {
-              color: var(--muted);
-              text-decoration: none;
-              font-size: 12px;
-              font-weight: 800;
-              border: 1px solid var(--line);
-              border-radius: 999px;
-              padding: 7px 11px;
-            }
-            a.action:hover, .add-snippet:hover { color: var(--purple); border-color: var(--purple); }
-            a.danger:hover { color: #c0392b; border-color: #c0392b; }
-            @media (max-width: 840px) {
-              .snippet-grid { grid-template-columns: 1fr; }
-            }
-        """.replace("__BUTTON__", Theme.button)
-        return f"""
-        <!doctype html>
-        <html lang="tr">
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <title>Geliştirici</title>
-          <style>{self._internal_page_base_css()}{devtools_css}</style>
-        </head>
-        <body>
-          <main class="wide">
-            <p class="eyebrow">F6 Developer Tools</p>
-            <h1>Geliştirici</h1>
-            <p class="subtitle">'{html_module.escape(self.profile_name)}' profiline ait JS/CSS snippet kütüphanesi. Snippet'ler aktif sekmede çalıştırılır.</p>
-            <div class="devtools-toolbar">
-              <a class="add-snippet" href="tabx://devtools/add">+ Snippet ekle</a>
-            </div>
-            <section class="snippet-grid">{body}</section>
           </main>
         </body>
         </html>
@@ -4504,6 +4853,7 @@ class BrowserWindow(QMainWindow):
               --shadow: __SHADOW__;
               --map-dot: __MAP_DOT__;
               --page-top: __PAGE_TOP__;
+              --motion-fast: __MOTION_FAST__ms;
             }
             * { box-sizing: border-box; }
             body {
@@ -4512,8 +4862,8 @@ class BrowserWindow(QMainWindow):
               font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, Arial, sans-serif;
               color: var(--text);
               background:
-                radial-gradient(circle at 26% 16%, rgba(124,92,255,.12), transparent 24%),
-                radial-gradient(circle at 78% 12%, rgba(47,128,237,.10), transparent 25%),
+                radial-gradient(circle at 26% 16%, color-mix(in srgb, var(--purple) 12%, transparent), transparent 24%),
+                radial-gradient(circle at 78% 12%, color-mix(in srgb, var(--blue) 10%, transparent), transparent 25%),
                 linear-gradient(180deg, var(--page-top) 0%, var(--bg) 100%);
               overflow-x: hidden;
             }
@@ -4572,7 +4922,9 @@ class BrowserWindow(QMainWindow):
               background: var(--card);
               border: 1px solid var(--line);
               box-shadow: 0 20px 60px var(--shadow);
+              transition: border-color var(--motion-fast) ease-out;
             }
+            .search:focus-within { border-color: var(--purple); }
             .search span { color: var(--purple); font-weight: 900; }
             .search input {
               border: 0;
@@ -4631,7 +4983,11 @@ class BrowserWindow(QMainWindow):
               border-radius: 6px;
               background: var(--panel-alt);
               border: 1px solid var(--line-soft);
+              opacity: 0;
+              transition: opacity var(--motion-fast) ease-out;
             }
+            .quick-card:hover .quick-remove, .quick-remove:focus-visible { opacity: 1; }
+            .quick-remove:hover { color: var(--purple); }
             .mark {
               width: 34px;
               height: 34px;
@@ -4661,7 +5017,7 @@ class BrowserWindow(QMainWindow):
               fill: none;
               stroke: color-mix(in srgb, var(--purple) 46%, transparent);
               stroke-width: 1.5;
-              transition: d .18s ease, opacity .18s ease;
+              transition: d var(--motion-fast) ease-out, opacity var(--motion-fast) ease-out;
             }
             .node {
               position: absolute;
@@ -4675,9 +5031,9 @@ class BrowserWindow(QMainWindow):
               box-shadow: 0 16px 38px var(--shadow);
               font-size: 12px;
               font-weight: 900;
-              cursor: grab;
+              cursor: pointer;
               transform: translate(-50%, -50%);
-              transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease;
+              transition: box-shadow var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out, transform var(--motion-fast) ease-out;
             }
             .node:active, .node.dragging {
               cursor: grabbing;
@@ -4734,37 +5090,16 @@ class BrowserWindow(QMainWindow):
               <div class="logo">TX</div>
               <h1>TabX</h1>
               <p class="subtitle">Web'i hızlı, sade ve akıllı keşfet.</p>
-              <form class="search" id="search">
-                <span>TX</span>
-                <input id="query" autofocus placeholder="Ara veya URL gir" />
-              </form>
+              __SEARCH_FORM__
             </section>
 
-            <div class="quick-heading"><span>Hızlı Erişim</span><a class="quick-add" href="tabx://newtab/add-speed-dial">+ Ekle</a></div>
-            <section class="quick">
-              __QUICK_CARDS__
-            </section>
+            __QUICK_SECTION__
 
-            <div class="webmap-title">Web Haritası</div>
-            <section class="network">
-              <svg class="links" viewBox="0 0 680 230" preserveAspectRatio="none" aria-hidden="true">
-                <path data-link="g" />
-                <path data-link="gh" />
-                <path data-link="ai" />
-                <path data-link="yt" />
-                <path data-link="va" />
-              </svg>
-              <div class="node hub">TX</div>
-              <div class="node n1" data-node="g">G</div>
-              <div class="node n2" data-node="gh">GH</div>
-              <div class="node n3" data-node="ai">AI</div>
-              <div class="node n4" data-node="yt">YT</div>
-              <div class="node n5" data-node="va">VA</div>
-            </section>
-            <div class="status"><span>TX</span><div class="trail"></div><span>Web keşfediliyor...</span></div>
+            __WEBMAP_SECTION__
           </main>
           <script>
-            document.getElementById('search').addEventListener('submit', function (event) {
+            const searchForm = document.getElementById('search');
+            if (searchForm) searchForm.addEventListener('submit', function (event) {
               event.preventDefault();
               const raw = document.getElementById('query').value.trim();
               if (!raw) return;
@@ -4775,6 +5110,7 @@ class BrowserWindow(QMainWindow):
 
             (function () {
               const network = document.querySelector('.network');
+              if (!network) return;
               const hub = network.querySelector('.hub');
               const nodes = Array.from(network.querySelectorAll('[data-node]'));
               const paths = new Map(Array.from(network.querySelectorAll('[data-link]')).map(path => [path.dataset.link, path]));
@@ -4840,16 +5176,22 @@ class BrowserWindow(QMainWindow):
                   node.classList.add('dragging');
                   const start = center(node);
                   const origin = { x: event.clientX, y: event.clientY };
+                  let moved = 0;
                   function move(moveEvent) {
+                    moved = Math.max(moved, Math.hypot(moveEvent.clientX - origin.x, moveEvent.clientY - origin.y));
                     place(node, start.x + moveEvent.clientX - origin.x, start.y + moveEvent.clientY - origin.y);
                     updateLinks();
                   }
-                  function done() {
+                  function done(endEvent) {
                     node.classList.remove('dragging');
                     node.removeEventListener('pointermove', move);
                     node.removeEventListener('pointerup', done);
                     node.removeEventListener('pointercancel', done);
                     savePositions();
+                    // Kisa tiklama (surukleme degil) dugumun sitesini acar.
+                    if (endEvent.type === 'pointerup' && moved < 5 && node.dataset.url) {
+                      window.location.href = node.dataset.url;
+                    }
                   }
                   node.addEventListener('pointermove', move);
                   node.addEventListener('pointerup', done);
@@ -4863,16 +5205,55 @@ class BrowserWindow(QMainWindow):
         </body>
         </html>
         """
-        quick_cards = "".join(
-            f'<div class="quick-card"><a class="card" href="{html_module.escape(url, quote=True)}"><div class="mark">{html_module.escape(icon)}</div>{html_module.escape(title)}</a><a class="quick-remove" href="tabx://newtab/remove-speed-dial?index={index}" title="Kısayolu kaldır">×</a></div>'
-            for index, (icon, title, url) in enumerate(self.speed_dials[:6])
+        # F7: newtab bolumleri profil bazli shell_layout'tan acilir/kapanir.
+        newtab_sections = self.shell_layout["newtab_sections"]
+        search_form = (
+            '<form class="search" id="search">'
+            "<span>TX</span>"
+            '<input id="query" autofocus placeholder="Ara veya URL gir" />'
+            "</form>"
+            if newtab_sections.get("search", True)
+            else ""
         )
-        mode = Theme.mode()
-        page_top = Theme.panel if mode == "dark" else "#fbfbff"
-        map_dot = Theme.border if mode == "dark" else "#c8ceda"
+        quick_section = ""
+        if newtab_sections.get("quick", True):
+            quick_cards = "".join(
+                f'<div class="quick-card"><a class="card" href="{html_module.escape(url, quote=True)}"><div class="mark">{html_module.escape(icon)}</div>{html_module.escape(title)}</a><a class="quick-remove" href="tabx://newtab/remove-speed-dial?index={index}" title="Kısayolu kaldır">×</a></div>'
+                for index, (icon, title, url) in enumerate(self.speed_dials[:6])
+            )
+            quick_section = (
+                '<div class="quick-heading"><span>Hızlı Erişim</span>'
+                '<a class="quick-add" href="tabx://newtab/add-speed-dial">+ Ekle</a></div>'
+                f'<section class="quick">{quick_cards}</section>'
+            )
+        webmap_section = ""
+        if newtab_sections.get("webmap", True):
+            webmap_section = """
+            <div class="webmap-title">Web Haritası</div>
+            <section class="network">
+              <svg class="links" viewBox="0 0 680 230" preserveAspectRatio="none" aria-hidden="true">
+                <path data-link="g" />
+                <path data-link="gh" />
+                <path data-link="ai" />
+                <path data-link="yt" />
+                <path data-link="va" />
+              </svg>
+              <div class="node hub">TX</div>
+              <div class="node n1" data-node="g" data-url="https://google.com" title="Google">G</div>
+              <div class="node n2" data-node="gh" data-url="https://github.com" title="GitHub">GH</div>
+              <div class="node n3" data-node="ai" data-url="https://chat.openai.com" title="ChatGPT">AI</div>
+              <div class="node n4" data-node="yt" data-url="https://youtube.com" title="YouTube">YT</div>
+              <div class="node n5" data-node="va" data-url="https://vaha.org" title="Vaha.org">VA</div>
+            </section>
+            <div class="status"><span>TX</span><div class="trail"></div><span>Düğüme tıkla: site açılır · sürükle: yerleşimi düzenle</span></div>
+            """
+        page_top = Theme.panel
+        map_dot = Theme.mix(Theme.border, Theme.subtle, 0.45)
         return (
             template.replace("__BG__", Theme.bg)
-            .replace("__QUICK_CARDS__", quick_cards)
+            .replace("__SEARCH_FORM__", search_form)
+            .replace("__QUICK_SECTION__", quick_section)
+            .replace("__WEBMAP_SECTION__", webmap_section)
             .replace("__PANEL__", Theme.panel)
             .replace("__PANEL_ALT__", Theme.panel_alt)
             .replace("__CARD__", Theme.card)
@@ -4889,6 +5270,7 @@ class BrowserWindow(QMainWindow):
             .replace("__SHADOW__", Theme.shadow)
             .replace("__MAP_DOT__", map_dot)
             .replace("__PAGE_TOP__", page_top)
+            .replace("__MOTION_FAST__", str(Motion.FAST if Motion.enabled else 0))
         )
 
 

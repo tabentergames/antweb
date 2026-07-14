@@ -29,9 +29,15 @@ class Theme:
             "border_soft": "#edf0f6",
             "text": "#172033",
             "muted": "#6b7280",
-            "subtle": "#9aa4b2",
+            "subtle": "#64708a",
             "purple": "#7c5cff",
             "blue": "#2f80ed",
+            # Durum/sinyal renkleri — risk ve basari mesajlari yalnizca
+            # bu tokenlardan gelir, sayfa iclerinde sabit hex yazilmaz.
+            "danger": "#c0392b",
+            "success": "#117a43",
+            # Klavye odagi/focus halkasi — purple ailesinden turetilmis.
+            "focus_ring": "#b7a7ff",
             "purple_soft": "#f0edff",
             "blue_soft": "#eaf3ff",
             "button": "#ffffff",
@@ -57,9 +63,12 @@ class Theme:
             "border_soft": "#252b38",
             "text": "#eef2f8",
             "muted": "#a6afbd",
-            "subtle": "#737f91",
+            "subtle": "#8a96a8",
             "purple": "#9b87ff",
             "blue": "#6bb6ff",
+            "danger": "#ef6e61",
+            "success": "#3ecf8e",
+            "focus_ring": "#8f7bff",
             "purple_soft": "#2a2547",
             "blue_soft": "#1b314b",
             "button": "#202634",
@@ -118,8 +127,8 @@ class Theme:
                 font-weight: 600;
             }}
             QToolTip {{
-                background-color: #111827;
-                color: white;
+                background-color: {cls.text};
+                color: {cls.bg};
                 border: none;
                 border-radius: 6px;
                 padding: 6px 8px;

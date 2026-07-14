@@ -788,6 +788,64 @@ def run() -> int:
         "ozel kisayol silinmedi"
     )
 
+    # F7 — ozellestirme merkezi: sayfa render, toolbar tasi/sirala, bolum
+    # toggle'lari, newtab bolumleri ve reset (onay modali monkeypatch'lenir).
+    layout_backup = {
+        "toolbar_actions": list(window.shell_layout["toolbar_actions"]),
+        "left_sections": dict(window.shell_layout["left_sections"]),
+        "right_sections": dict(window.shell_layout["right_sections"]),
+        "newtab_sections": dict(window.shell_layout["newtab_sections"]),
+    }
+    customize_html = window._customize_page_html()
+    assert "Özelleştirme Merkezi" in customize_html, "customize sayfasi render edilmedi"
+    assert "card-toolbar" in customize_html and "card-reset" in customize_html, (
+        "customize kartlari eksik"
+    )
+    assert window.move_shell_action("downloads", True), "eylem toolbara tasinamadi"
+    assert window.shell_layout["toolbar_actions"][-1] == "downloads", "tasima sona eklemedi"
+    assert window.shift_shell_action("downloads", -1), "eylem sola alinamadi"
+    assert window.shell_layout["toolbar_actions"][-2] == "downloads", "siralama degismedi"
+    assert not window.shift_shell_action(
+        window.shell_layout["toolbar_actions"][0], -1
+    ), "ilk eleman soldan tasabildi"
+    persisted_layout = UiStateStore.load()["shell_layout_by_profile"].get(
+        window.profile_name, {}
+    )
+    assert "downloads" in persisted_layout.get("toolbar_actions", []), (
+        "toolbar duzeni persist edilmedi"
+    )
+    assert window.move_shell_action("downloads", False), "eylem menuye dondurulemedi"
+    # Toggle'lar deterministik olsun: once bolumlerin ACIK oldugu garanti edilir.
+    if not window.shell_layout["right_sections"]["tab_groups"]:
+        window.toggle_shell_section("right_sections", "tab_groups")
+    if not window.shell_layout["newtab_sections"]["webmap"]:
+        window.toggle_shell_section("newtab_sections", "webmap")
+    assert window.toggle_shell_section("right_sections", "tab_groups"), (
+        "sag panel bolumu toggle edilemedi"
+    )
+    assert window.toggle_shell_section("newtab_sections", "webmap"), (
+        "newtab bolumu toggle edilemedi"
+    )
+    assert 'data-node="g"' not in window._new_tab_html(), (
+        "webmap kapaliyken newtab'da gorunuyor"
+    )
+    window._rebuild_visual_shell()
+    assert window.tab_groups_layout is None, "kapali sekme gruplari bolumu yine kuruldu"
+    assert window.workspace_layout is not None, "acik calisma alanlari bolumu kurulmadi"
+    original_confirm_reset = window._confirm_reset_shell_layout
+    window._confirm_reset_shell_layout = lambda: True
+    assert window.reset_shell_layout(), "duzen sifirlanamadi"
+    window._confirm_reset_shell_layout = original_confirm_reset
+    assert window.shell_layout == window._normalize_shell_layout(None), (
+        "reset varsayilana donmedi"
+    )
+    assert 'data-node="g"' in window._new_tab_html(), "reset webmap'i geri getirmedi"
+    # Testin dokundugu duzeni eski haline getir ve kabugu yeniden kur.
+    window.shell_layout = window._normalize_shell_layout(layout_backup)
+    window._store_shell_layout()
+    window._rebuild_visual_shell()
+    assert window.tab_groups_layout is not None, "geri yuklemede bolum kurulmadi"
+
     # F2.5 — tab strip ekle/kapat: once reduced-motion yolu (deterministik).
     window.open_internal_page("newtab")
     assert window._newtab_entry_overlay is None, (

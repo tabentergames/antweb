@@ -58,9 +58,9 @@ Bu sürümde F2 için ilk görsel kabuk eklendi:
 - `tabx://audit` ile iç sayfaları ve tarayıcı kabuğu yüzeylerini denetleme, her yüzey için profile bağlı tespit notu ekleme
 - Yeni sekmede profil bazlı düzenlenebilir hızlı erişim kartları; aynı site bağlamındaki sekmeler için sekme adaları
 - Görünür alanı PNG olarak kaydetme/panoya kopyalama ve tam sayfayı PDF olarak dışa aktarma
-- RAM tüketimini sınırlamak için fan sekme modu ve ek WebEngine görünümleri şimdilik eklenmedi; F2 kriteri esnek sekme konumu ile kapatıldı
 
-> Not: Fan sekme modu sonraki görsel iterasyona bırakıldı; F2 bu sürümde tema motoru + esnek sekme konumu ile tamamlandı.
+> Not: F2, tema motoru + esnek sekme konumu ile kapatıldı; fan sekme modu
+> (`❖` toolbar butonu, snapshot kartlı overlay) daha sonra F2.5'te eklendi.
 
 ---
 
@@ -74,69 +74,76 @@ Mevcut tarayıcılardan en iyi özellikleri alıp bunlara yenilerini ekleyerek o
 
 ## ✨ Özellikler
 
-### 🔒 Gizlilik & Güvenlik
+> Bu bölüm ikiye ayrılır: **Mevcut** maddeler kodda çalışır durumdadır ve
+> `scripts/smoke_test.py` kapsamındadır; **Planlanan** maddeler ürün vizyonudur
+> ve henüz uygulanmamıştır. Firma içi pilotta yalnızca "Mevcut" bölümüne güven.
 
-- **Yerleşik reklam engelleyici** — uBlock Origin seviyesinde, sıfır kurulum gerektirmez
-- **İzleyici engelleme** — 3. taraf çerez ve browser fingerprint koruması
-- **HTTPS zorunluluğu** — HTTP bağlantıları otomatik olarak HTTPS'e yükseltilir
-- **Güçlendirilmiş gizli mod** — DNS-over-HTTPS desteği, oturum sonunda tam bellek temizleme
-- **Yerleşik şifre yöneticisi** — TabX'e özel, AES-256 şifreli local vault
-- **İzin yöneticisi** — Mikrofon, kamera, konum ve bildirim izinleri için gelişmiş kontrol paneli
+### ✅ Mevcut
 
-### 🖥️ Arayüz & Sekme Sistemi
+**🔒 Gizlilik & Güvenlik**
 
-- **Esnek sekme konumu** — Üst, alt, sağ veya sol kenarda sekme çubuğu
-- **Fan sekme modu** — Ekranın köşesinde 90° yarım daire şeklinde açılan yenilikçi sekme görünümü
-- **Opera tarzı uygulama çubuğu** — Tam özelleştirilebilir, sürükle-bırak ile düzenlenebilir
-- **Tema motoru** — Açık / koyu mod ve tamamen özel renk paleti desteği
+- **Reklam/izleyici engelleyici** — Domain blocklist tabanlı ilk dilim (~50 domain, subdomain destekli); ayarlardan kapatılabilir
+- **HTTPS yükseltme** — HTTP istekleri HTTPS'e yönlendirilir (localhost muaf); kapatılabilir
+- **İzin yöneticisi** — Kamera, mikrofon, konum ve bildirim için sor / izin ver / reddet modu
+- **Site verisi temizleme** — Onay dialogu sonrası HTTP cache + tüm çerezler
+- **TabX eklenti sistemi** — Manifest tabanlı JS/CSS injection runtime'ı (`data/extensions/`)
+
+**🖥️ Arayüz & Sekme Sistemi**
+
+- **Özelleştirme merkezi** — `tabx://customize`; toolbar eylemleri (sırala, ⋯ menüsüne taşı), panel bölümleri, Power UX modülleri ve başlangıç ekranı bölümleri profil bazlı tek yüzeyden yönetilir; onaylı "düzeni sıfırla"
+- **Tema motoru** — Açık/koyu token setleri (`ui/theme.py`), kalıcı tercih
+- **Esnek sekme konumu** — Sekme çubuğu üst veya alt kenarda
+- **Fan sekme modu** — Toolbar `❖` ile açılan, snapshot kartlı overlay sekme görünümü
 - **Scroll auto-hide chrome** — Aşağı kayarken sekme çubuğu ve adres çubuğu gizlenir; yukarı kayınca veya üst kenara mouse gelince geri açılır
-- **Kısayol editörü** — TabX'e özel tüm klavye kısayollarını özelleştir
-- **Widget tabanlı başlangıç sayfası** — Saat, hava durumu, hızlı bağlantılar ve daha fazlası
-- **TabX eklenti sistemi** — JS/CSS injection tabanlı kendi hafif eklenti mimarisi (ad-blocker, çeviri, not vb. yerleşik eklentiler olarak çalışır)
-- **Site bazlı font & zoom hafızası** — Her site için ayrı tercih saklama
+- **Komut paleti** — `Ctrl/Cmd+K`; sekme, gezinme, görünüm, üretkenlik ve geliştirici eylemlerine arayarak erişim
+- **Split view, video PiP, sidebar web panelleri, mouse gestures** — Her biri profil bazlı kapatılabilir Power UX modülü
+- **Yeni sekme dashboard'u** — Profil bazlı hızlı erişim kartları + sürüklenebilir/tıklanabilir Web Haritası
+- **Sekme adaları ve favicon'lar** — Aynı hosttaki ardıl sekmeler görsel olarak gruplanır
+- **Arama motoru seçimi** — Google/Bing/DuckDuckGo/Yandex; adres çubuğu URL olmayan girdiyi seçili motorda arar
+- **Downloads, error page, context menu, klavye kısayolları** — TabX temalı temel tarayıcı yüzeyleri (kısayol seti şimdilik sabittir)
 
 > ℹ️ **Uzantılar hakkında not:** TabX, QtWebEngine üzerine kurulu olduğu için Chrome Web Store'un native uzantı sistemini (`chrome.*` API'leri, `.crx` yükleyici) doğrudan desteklemez. Bunun yerine kendi hafif eklenti mimarisini kullanır. Tam Chrome uzantı uyumluluğu yalnızca Chromium fork'u ile mümkündür ve uzun vadeli bir araştırma hedefidir (bkz. Yol Haritası).
 
-### 👤 Çoklu Profil & Workspace
+**👤 Çoklu Profil & Workspace**
 
-- **Profil sistemi** — İş, kişisel ve proje bazlı ayrı profiller
-- **Workspace yönetimi** — Her workspace için bağımsız sekmeler, geçmiş ve uzantı grupları
-- **Renk kodlu sekme grupları** — Çöküş korumalı, isimlendirilmiş sekme grupları
-- **Oturum kaydetme** — Tüm sekme düzenini dondur ve istediğin zaman geri yükle
+- **Profil sistemi** — İzole storage/cache ile isimli profiller; toolbar çipinden geçiş
+- **Workspace yönetimi** — Workspace başına bağımsız sekme seti; sağ panelden geçiş/ekle/sil
+- **Sekme grupları** — İsimlendirilmiş, tıklanabilir grup kayıtları
+- **Oturum kaydetme** — Sekme düzeni kapanışta ve geçişlerde saklanır, açılışta geri yüklenir
 
-### 🌍 Çeviri & Sayfa Araçları
+**📝 Not Alma & Web Clipper**
 
-- **Sağ tık çevirisi** — Tam sayfa veya seçili metin için anında çeviri
-- **Seçim balonu** — Herhangi bir metni seçince üzerinde çeviri popup'ı açılır
-- **Ekran görüntüsü yakalama** — Alan seçimi, tam sayfa ve kayan (scrolling) yakalama
-- **Okuyucu modu** — Dikkat dağıtıcı öğeleri kaldırarak temiz makale görünümü
+- **Not sistemi** — `tabx://notes` üzerinde profil bazlı local notlar (ilk dilimde düz metin; Markdown render sonraki dilim)
+- **Web clipper** — Seçili metni sağ tık "Nota kaydet" ile sayfa başlığı + kaynak URL'siyle nota kaydetme
+- **Yer imleri ve geçmiş** — SQLite tabanlı, sade ilk dilim (`tabx://bookmarks`, `tabx://history`)
 
-### 📝 Not Alma & Web Clipper
-
-- **Görsel not sistemi** — Markdown destekli, arama yapılabilir, local depolama
-- **Sayfa kırpma** — Seçim, tam sayfa veya makale modu ile içerik kaydetme
-- **Gelişmiş yer imleri** — Etiket, klasör ve akıllı arama desteği
-- **Dışa aktarım** — Notion, Obsidian ve Markdown formatlarına aktarım
-
-### ✅ Productivity Araçları
+**✅ Productivity Araçları**
 
 - **Todo list** — Toolbar `✓` ile açılan floating widget; görevler profil bazlı SQLite'ta saklanır
-- **Scrum / Kanban board** — `tabx://tasks` üzerinde backlog / doing / done kolonları; kartlar profil bazlı SQLite'ta saklanır
-- **Not sistemi** — `tabx://notes` üzerinde local Markdown notları; ilk sürümde ekle/listele/sil
-- **Zaman takibi** — Görev bazlı timer ve günlük/haftalık raporlar
-- **Takvim görünümü** — Görevleri ve sprint'leri takvim üzerinde planlama
-- **Sprint yönetimi** — Backlog, aktif sprint ve tamamlanan görevler
-- **Öncelik & etiket sistemi** — Yüksek / orta / düşük öncelik, renk kodlu etiketler
+- **Kanban board** — `tabx://tasks` üzerinde backlog / doing / done kolonları; kartlar profil bazlı SQLite'ta saklanır
 
-### 🛠️ Geliştirici Araçları
+**🛠️ Geliştirici Araçları**
 
-- **Chromium DevTools** — Aktif sekmenin yanında açılan, yeniden boyutlandırılabilir sağ dock; `Ctrl+Alt+I`, sağ tık “İncele” veya `⋯` menüsünden açılır
-- **Terminal entegrasyonu** — Tarayıcı içinden doğrudan terminal erişimi
-- **Kodlama modu** — Yerleşik kod editörü, tarayıcıyla yan yana çalışma
-- **Local sunucu (PHP + MySQL)** — XAMPP benzeri, tarayıcı içi local geliştirme ortamı
+- **Chromium DevTools** — Aktif sekmenin yanında açılan, yeniden boyutlandırılabilir sağ dock; `Ctrl+Alt+I`, sağ tık "İncele" veya `⋯` menüsünden açılır
 - **İstek yakalama** — Profilin interceptor zincirinden beslenen, oturumluk ve 500 kayıtla sınırlı URL/metot/kaynak türü günlüğü
 - **Profil bazlı user-agent** — QtWebEngine işareti içermeyen Chrome uyumlu varsayılan, dinamik mobil UA veya özel değer; profil bazında kalıcı
 - **Snippet kütüphanesi** — Profil bazlı JS/CSS snippet'lerini kaydet, önizle ve açık kullanıcı eylemiyle aktif sekmede çalıştır
+
+### 🧭 Planlanan (henüz kodda yok)
+
+- **Şifre yöneticisi** — AES-256 şifreli local vault
+- **Güçlendirilmiş gizli mod** — DNS-over-HTTPS, oturum sonunda tam bellek temizleme
+- **Fingerprint koruması ve 3. taraf çerez politikası**
+- **Çeviri** — Sağ tık çevirisi ve seçim balonu
+- **Okuyucu modu**
+- **Gelişmiş ekran görüntüsü** — Alan seçimi ve kayan (scrolling) yakalama
+- **Zaman takibi, takvim görünümü, sprint yönetimi, öncelik & etiket sistemi**
+- **Terminal entegrasyonu, kodlama modu, local sunucu (PHP + MySQL)**
+- **Kısayol editörü** — Klavye kısayollarını özelleştirme
+- **Site bazlı font & zoom hafızası**
+- **Not/yer imi dışa aktarımı** — Notion, Obsidian, Markdown; bookmark etiket/klasör
+- **Widget tabanlı başlangıç sayfası** — Saat, hava durumu vb.
+- **Sağ/sol kenar sekme çubuğu, sürükle-bırak uygulama çubuğu, özel renk paleti**
 
 ---
 
@@ -208,12 +215,12 @@ tabx-browser/
 ├── features/           # Özellik modülleri (her biri bağımsız)
 │   ├── privacy/        # Ad/tracker blocking, izleyici koruması
 │   ├── extensions/     # TabX eklenti sistemi (JS/CSS injection)
-│   ├── devtools/       # Terminal, kod editörü, istek yakalama
-│   ├── productivity/   # Todo, Kanban, takvim
-│   └── notes/          # Not sistemi, web clipper
+│   ├── devtools/       # DevTools dock, snippet, user-agent, istek yakalama
+│   ├── productivity/   # Todo, Kanban, notlar
+│   └── power_ux/       # Komut paleti, split view, PiP, web panelleri
 ├── data/               # Local SQLite veritabanları
-├── assets/             # İkonlar, temalar, fontlar
-├── tests/              # Test dosyaları
+├── assets/             # İkonlar, temalar, fontlar (hedef — henüz yok)
+├── tests/              # Test dosyaları (hedef — şimdilik scripts/smoke_test.py)
 ├── docs/               # Belgelendirme
 │   └── AGENT_WORKFLOW.md   # 🤖 Agent iş akış planı (geliştirme rehberi)
 ├── AGENTS.md           # Agent'lar için giriş yönergesi
