@@ -19,40 +19,43 @@ class Theme:
     RADIUS_LG = 18
     RADIUS_PILL = 999
 
+    # Tasarim dili: kirik beyaz zemin, beyaz yuzeyler, tek sakin mavi vurgu.
+    # "purple" token adi tarihsel — degeri artik vurgu mavisidir; tum aktif
+    # durum/vurgu renkleri bu tokendan akar.
     _palettes = {
         "light": {
-            "bg": "#f6f7fb",
-            "panel": "#fbfbfe",
-            "panel_alt": "#f1f3f8",
+            "bg": "#f7f8fa",
+            "panel": "#ffffff",
+            "panel_alt": "#f1f3f7",
             "card": "#ffffff",
-            "border": "#e2e6ef",
-            "border_soft": "#edf0f6",
-            "text": "#172033",
+            "border": "#e7e9ee",
+            "border_soft": "#eef0f4",
+            "text": "#20242a",
             "muted": "#6b7280",
-            "subtle": "#64708a",
-            "purple": "#7c5cff",
-            "blue": "#2f80ed",
+            "subtle": "#7c8494",
+            "purple": "#6f9cf5",
+            "blue": "#6f9cf5",
             # Durum/sinyal renkleri — risk ve basari mesajlari yalnizca
             # bu tokenlardan gelir, sayfa iclerinde sabit hex yazilmaz.
             "danger": "#c0392b",
-            "success": "#117a43",
-            # Klavye odagi/focus halkasi — purple ailesinden turetilmis.
-            "focus_ring": "#b7a7ff",
-            "purple_soft": "#f0edff",
-            "blue_soft": "#eaf3ff",
+            "success": "#3d9a6f",
+            # Klavye odagi/focus halkasi — vurgu mavisinden turetilmis.
+            "focus_ring": "#a8c2f7",
+            "purple_soft": "#edf2fe",
+            "blue_soft": "#edf2fe",
             "button": "#ffffff",
-            "button_hover": "#f1f3f8",
-            "tab_inactive": "#eef1f7",
+            "button_hover": "#f1f3f7",
+            "tab_inactive": "#eef0f4",
             "tab_hover": "#ffffff",
             "input": "#ffffff",
-            "toolbar": "rgba(251, 251, 254, 0.96)",
-            "shadow": "rgba(31, 41, 55, 0.08)",
+            "toolbar": "rgba(255, 255, 255, 0.96)",
+            "shadow": "rgba(32, 36, 42, 0.06)",
             # Seffaf (glass) yuzeyler — panel/overlay'lerde duz panel rengi
             # yerine bunlar kullanilirsa altta kalan icerik hissedilir.
-            "glass": "rgba(251, 251, 254, 0.78)",
-            "glass_strong": "rgba(251, 251, 254, 0.92)",
-            "glass_border": "rgba(23, 32, 51, 0.10)",
-            "scrim": "rgba(23, 32, 51, 0.32)",
+            "glass": "rgba(255, 255, 255, 0.80)",
+            "glass_strong": "rgba(253, 253, 254, 0.94)",
+            "glass_border": "rgba(32, 36, 42, 0.08)",
+            "scrim": "rgba(32, 36, 42, 0.30)",
         },
         "dark": {
             "bg": "#10131a",
@@ -64,13 +67,13 @@ class Theme:
             "text": "#eef2f8",
             "muted": "#a6afbd",
             "subtle": "#8a96a8",
-            "purple": "#9b87ff",
-            "blue": "#6bb6ff",
+            "purple": "#85abf2",
+            "blue": "#85abf2",
             "danger": "#ef6e61",
             "success": "#3ecf8e",
-            "focus_ring": "#8f7bff",
-            "purple_soft": "#2a2547",
-            "blue_soft": "#1b314b",
+            "focus_ring": "#5f83c8",
+            "purple_soft": "#1d2a42",
+            "blue_soft": "#1d2a42",
             "button": "#202634",
             "button_hover": "#293143",
             "tab_inactive": "#202634",
@@ -120,7 +123,6 @@ class Theme:
     def _build_qss(cls):
         return f"""
             QWidget {{
-                font-family: Arial;
                 color: {cls.text};
             }}
             QPushButton {{

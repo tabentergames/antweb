@@ -93,6 +93,7 @@ Her biri kapatilabilir modul olarak `features/` altina gider; cekirdege gomulmez
 
 | Durum | Is | Not |
 | --- | --- | --- |
+| in-progress | Yeni nesil sade tarayici tasarim donusumu | Kullanici promptu F7 icinde yan tasarim isi olarak kabul edildi: AI merkeze alinmayacak, once gercek yuzeylere bagli tema/newtab/compact rail/toolbar/panel yenilemeleri yapilacak. Ilk dilimler: premium acik tema, kapsul newtab aramasi, sade hizli erisim, overlay compact sol rail, gizlilik kalkanı, baglamsal arac cubugu, sol workspace/sekmeler paneli. AI icin gecici GPT/OpenAI paneli eklendi; `OPENAI_API_KEY` yoksa sahte cevap uretmez. |
 | done | Scroll auto-hide browser chrome | Asagi scroll'da tab strip + toolbar yuksekligi animasyonla 0'a iner; yukari scroll veya ust kenar hotspot hover'i geri acar. Webview'e efekt uygulanmaz. |
 | done | Split view | Aktif sayfayi ayni profile bagli ikinci web gorunumuyle gecici yatay splitter icinde yan yana acar; sekme/profil/tema/workspace gecisinde kapanir. |
 | done | Video pop-out | Aktif sayfadaki oynatilabilir video icin Chromium Picture-in-Picture istegi; desteklenmez veya reddedilirse ayni profil ile always-on-top video penceresi yedegi acilir. |

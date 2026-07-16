@@ -91,6 +91,7 @@ Mevcut tarayıcılardan en iyi özellikleri alıp bunlara yenilerini ekleyerek o
 **🖥️ Arayüz & Sekme Sistemi**
 
 - **Özelleştirme merkezi** — `tabx://customize`; toolbar eylemleri (sırala, ⋯ menüsüne taşı), panel bölümleri, Power UX modülleri ve başlangıç ekranı bölümleri profil bazlı tek yüzeyden yönetilir; onaylı "düzeni sıfırla"
+- **Yardımcı paneli (opsiyonel GPT)** — Toolbar/sol rail üzerinden açılan sağ overlay; `OPENAI_API_KEY` varsa OpenAI Responses API ile sayfa bağlamına göre yanıt üretir, key yoksa sahte cevap göstermez
 - **Tema motoru** — Açık/koyu token setleri (`ui/theme.py`), kalıcı tercih
 - **Esnek sekme konumu** — Sekme çubuğu üst veya alt kenarda
 - **Fan sekme modu** — Toolbar `❖` ile açılan, snapshot kartlı overlay sekme görünümü

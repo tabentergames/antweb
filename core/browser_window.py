@@ -16,7 +16,7 @@ from pathlib import Path
 
 os.environ.setdefault("QT_WEBENGINE_CHROMIUM_FLAGS", "--enable-features=NetworkService")
 
-from PyQt6.QtCore import QPoint, Qt, QTimer, QUrl, QUrlQuery, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt, QThread, QTimer, QUrl, QUrlQuery, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWebEngineCore import (
     QWebEngineLoadingInfo,
@@ -35,6 +35,7 @@ from features.devtools import (
     SnippetController,
     UserAgentController,
 )
+from features.ai import OpenAIGptClient, OpenAIClientError
 from features.library.store import BookmarkStore, HistoryStore
 from features.productivity.kanban_store import KanbanStore
 from features.productivity.notes_store import NotesStore
@@ -542,6 +543,427 @@ class ChromeRevealHotspot(QFrame):
         super().enterEvent(event)
 
 
+class PrivacyFloatingPanel(QFrame):
+    """F7 privacy shield panel; reflects real F3 privacy state."""
+
+    def __init__(self, parent, shell):
+        super().__init__(parent)
+        self.shell = shell
+        self.setObjectName("privacyFloatingPanel")
+        self.setFixedSize(318, 324)
+        self.setStyleSheet(self._panel_style())
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(
+            Theme.SPACE_LG, Theme.SPACE_LG, Theme.SPACE_LG, Theme.SPACE_LG
+        )
+        layout.setSpacing(Theme.SPACE_MD)
+
+        header = QHBoxLayout()
+        header.setSpacing(Theme.SPACE_SM)
+        badge = QLabel("◇")
+        badge.setFixedSize(34, 34)
+        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        badge.setStyleSheet(
+            f"""
+            QLabel {{
+                background-color: {Theme.purple_soft};
+                color: {Theme.purple};
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: 900;
+            }}
+            """
+        )
+        header.addWidget(badge)
+        title_box = QVBoxLayout()
+        title_box.setSpacing(1)
+        title = QLabel("Gizlilik Koruması")
+        title.setStyleSheet(
+            f"font-size: 14px; font-weight: 850; color: {Theme.text}; background: transparent;"
+        )
+        self.subtitle = QLabel()
+        self.subtitle.setStyleSheet(
+            f"font-size: 12px; color: {Theme.subtle}; background: transparent;"
+        )
+        title_box.addWidget(title)
+        title_box.addWidget(self.subtitle)
+        header.addLayout(title_box, 1)
+        close = shell._icon_button("×", "Gizlilik panelini kapat")
+        close.setFixedSize(26, 26)
+        close.clicked.connect(lambda checked=False: shell.toggle_privacy_panel(False))
+        header.addWidget(close)
+        layout.addLayout(header)
+
+        self.count = QLabel()
+        self.count.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.count.setStyleSheet(
+            f"""
+            QLabel {{
+                background-color: {Theme.purple_soft};
+                border: 1px solid {Theme.glass_border};
+                border-radius: {Theme.RADIUS_LG}px;
+                color: {Theme.purple};
+                font-size: 34px;
+                font-weight: 850;
+                padding: {Theme.SPACE_LG}px;
+            }}
+            """
+        )
+        layout.addWidget(self.count)
+
+        self.ad_button = self._state_button()
+        self.ad_button.clicked.connect(self._toggle_ad_block)
+        layout.addWidget(self.ad_button)
+
+        self.https_button = self._state_button()
+        self.https_button.clicked.connect(self._toggle_https)
+        layout.addWidget(self.https_button)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(Theme.SPACE_SM)
+        settings = self._link_button("Ayarlar")
+        settings.clicked.connect(lambda checked=False: shell.open_internal_page("settings"))
+        actions.addWidget(settings)
+        clear = self._link_button("Site verilerini temizle")
+        clear.clicked.connect(self._clear_site_data)
+        actions.addWidget(clear)
+        layout.addLayout(actions)
+
+        self.render()
+
+    def _panel_style(self):
+        return f"""
+            QFrame#privacyFloatingPanel {{
+                background-color: {Theme.glass_strong};
+                border: 1px solid {Theme.glass_border};
+                border-radius: {Theme.RADIUS_LG}px;
+            }}
+        """
+
+    def _state_button(self):
+        btn = QPushButton()
+        btn.setFixedHeight(38)
+        btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                border: 1px solid {Theme.border_soft};
+                border-radius: {Theme.RADIUS_MD}px;
+                background-color: {Theme.card};
+                color: {Theme.text};
+                font-size: 12px;
+                font-weight: 750;
+                text-align: left;
+                padding: 0 {Theme.SPACE_MD}px;
+            }}
+            QPushButton:hover {{
+                border-color: {Theme.focus_ring};
+                background-color: {Theme.panel_alt};
+            }}
+            """
+        )
+        return btn
+
+    def _link_button(self, label):
+        btn = QPushButton(label)
+        btn.setFixedHeight(32)
+        btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                border: none;
+                border-radius: {Theme.RADIUS_SM}px;
+                background-color: {Theme.panel_alt};
+                color: {Theme.muted};
+                font-size: 11px;
+                font-weight: 750;
+                padding: 0 {Theme.SPACE_SM}px;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.purple_soft};
+                color: {Theme.purple};
+            }}
+            """
+        )
+        return btn
+
+    def _toggle_ad_block(self):
+        self.shell.toggle_ad_block()
+        self.render()
+
+    def _toggle_https(self):
+        self.shell.toggle_https_upgrade()
+        self.render()
+
+    def _clear_site_data(self):
+        self.shell.clear_site_data()
+        self.render()
+
+    def render(self):
+        protected = self.shell.ad_block_enabled and self.shell.https_upgrade_enabled
+        self.subtitle.setText("Koruma açık" if protected else "Koruma kısmi")
+        blocked = self.shell.privacy.ad_blocker.blocked_count
+        self.count.setText(f"{blocked}\nengellenen izleyici")
+        self.ad_button.setText(
+            f"Reklam engelleme: {'Açık' if self.shell.ad_block_enabled else 'Kapalı'}"
+        )
+        self.https_button.setText(
+            f"HTTPS yükseltme: {'Açık' if self.shell.https_upgrade_enabled else 'Kapalı'}"
+        )
+
+
+class ContextActionBar(QFrame):
+    """Selection-driven bottom action bar with only real browser actions."""
+
+    def __init__(self, parent, shell):
+        super().__init__(parent)
+        self.shell = shell
+        self.selected_text = ""
+        self.setObjectName("contextActionBar")
+        self.setFixedSize(430, 46)
+        self.setStyleSheet(
+            f"""
+            QFrame#contextActionBar {{
+                background-color: {Theme.glass_strong};
+                border: 1px solid {Theme.glass_border};
+                border-radius: 23px;
+            }}
+            """
+        )
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(6)
+        for label, tooltip, callback in [
+            ("Kopyala", "Seçili metni kopyala", self.copy_selection),
+            ("Not al", "Seçili metni nota kaydet", self.save_note),
+            ("Çevir", "Seçili metni çeviri sayfasında aç", self.translate_selection),
+            ("Screenshot", "Görünür alanı kaydet", self.capture),
+        ]:
+            btn = self._action_button(label, tooltip)
+            btn.clicked.connect(callback)
+            layout.addWidget(btn)
+
+    def _action_button(self, label, tooltip):
+        btn = QPushButton(label)
+        btn.setToolTip(tooltip)
+        btn.setFixedHeight(32)
+        btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                border: none;
+                border-radius: 16px;
+                background-color: transparent;
+                color: {Theme.muted};
+                font-size: 12px;
+                font-weight: 750;
+                padding: 0 {Theme.SPACE_MD}px;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.purple_soft};
+                color: {Theme.purple};
+            }}
+            """
+        )
+        return btn
+
+    def set_selection(self, text):
+        self.selected_text = text.strip()
+
+    def copy_selection(self):
+        if self.shell.current_view is not None:
+            self.shell.current_view.pageAction(QWebEnginePage.WebAction.Copy).trigger()
+
+    def save_note(self):
+        if self.selected_text:
+            self.shell.clip_to_note(self.selected_text)
+
+    def translate_selection(self):
+        if not self.selected_text:
+            return
+        encoded = QUrl.toPercentEncoding(self.selected_text[:1800]).data().decode()
+        url = f"https://translate.google.com/?sl=auto&tl=tr&text={encoded}&op=translate"
+        self.shell.add_new_tab(QUrl(url), "Çeviri")
+
+    def capture(self):
+        self.shell.capture_screenshot()
+
+
+class GptRequestWorker(QThread):
+    """Runs OpenAI requests away from the UI thread."""
+
+    succeeded = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+    def __init__(self, prompt, page_context, parent=None):
+        super().__init__(parent)
+        self.prompt = prompt
+        self.page_context = page_context
+
+    def run(self):  # noqa: D401
+        try:
+            answer = OpenAIGptClient().ask(self.prompt, self.page_context)
+        except OpenAIClientError as exc:
+            self.failed.emit(str(exc))
+        except Exception as exc:  # noqa: BLE001 - last-resort UI boundary
+            self.failed.emit(f"Yardımcı yanıt üretemedi: {exc}")
+        else:
+            self.succeeded.emit(answer)
+
+
+class AssistantPanel(QFrame):
+    """Optional GPT-backed assistant panel. No fake responses."""
+
+    def __init__(self, parent, shell):
+        super().__init__(parent)
+        self.shell = shell
+        self.setObjectName("assistantPanel")
+        self.setFixedSize(372, 540)
+        self.setStyleSheet(
+            f"""
+            QFrame#assistantPanel {{
+                background-color: {Theme.glass_strong};
+                border: 1px solid {Theme.glass_border};
+                border-radius: {Theme.RADIUS_LG}px;
+            }}
+            """
+        )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(
+            Theme.SPACE_LG, Theme.SPACE_LG, Theme.SPACE_LG, Theme.SPACE_LG
+        )
+        layout.setSpacing(Theme.SPACE_MD)
+
+        header = QHBoxLayout()
+        title_box = QVBoxLayout()
+        title_box.setSpacing(2)
+        title = QLabel("Yardımcı")
+        title.setStyleSheet(
+            f"font-size: 16px; font-weight: 850; color: {Theme.text}; background: transparent;"
+        )
+        self.status = QLabel()
+        self.status.setStyleSheet(
+            f"font-size: 12px; color: {Theme.subtle}; background: transparent;"
+        )
+        title_box.addWidget(title)
+        title_box.addWidget(self.status)
+        header.addLayout(title_box, 1)
+        close = shell._icon_button("×", "Yardımcıyı kapat")
+        close.setFixedSize(26, 26)
+        close.clicked.connect(lambda checked=False: shell.toggle_ai_panel(False))
+        header.addWidget(close)
+        layout.addLayout(header)
+
+        chips = QHBoxLayout()
+        chips.setSpacing(Theme.SPACE_SM)
+        for label, prompt in [
+            ("Özetle", "Bu sayfayı kısa ve maddeli özetle."),
+            ("Noktalar", "Bu sayfadaki önemli noktaları çıkar."),
+            ("Açıkla", "Seçili metni veya sayfanın ana fikrini açıkla."),
+        ]:
+            btn = self._chip(label)
+            btn.clicked.connect(lambda checked=False, text=prompt: shell.ask_ai(text, include_page=True))
+            chips.addWidget(btn)
+        chips.addStretch(1)
+        layout.addLayout(chips)
+
+        self.output = QPlainTextEdit()
+        self.output.setReadOnly(True)
+        self.output.setPlainText(self._initial_text())
+        self.output.setStyleSheet(
+            f"""
+            QPlainTextEdit {{
+                border: 1px solid {Theme.border_soft};
+                border-radius: {Theme.RADIUS_MD}px;
+                background-color: {Theme.card};
+                color: {Theme.text};
+                font-size: 13px;
+                padding: {Theme.SPACE_MD}px;
+            }}
+            """
+        )
+        layout.addWidget(self.output, 1)
+
+        input_row = QHBoxLayout()
+        input_row.setSpacing(Theme.SPACE_SM)
+        self.input = QLineEdit()
+        self.input.setPlaceholderText("Bu sayfa hakkında sor...")
+        self.input.setFixedHeight(36)
+        self.input.setStyleSheet(
+            f"""
+            QLineEdit {{
+                border: 1px solid {Theme.border};
+                border-radius: 18px;
+                background-color: {Theme.input};
+                color: {Theme.text};
+                padding: 0 {Theme.SPACE_MD}px;
+                font-size: 13px;
+            }}
+            QLineEdit:focus {{ border-color: {Theme.focus_ring}; }}
+            """
+        )
+        self.input.returnPressed.connect(self.submit)
+        input_row.addWidget(self.input, 1)
+        send = shell._icon_button("→", "Gönder")
+        send.clicked.connect(self.submit)
+        input_row.addWidget(send)
+        layout.addLayout(input_row)
+        self.refresh_status()
+
+    def _chip(self, label):
+        btn = QPushButton(label)
+        btn.setFixedHeight(30)
+        btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                border: 1px solid {Theme.border_soft};
+                border-radius: 15px;
+                background-color: {Theme.card};
+                color: {Theme.muted};
+                font-size: 12px;
+                font-weight: 750;
+                padding: 0 {Theme.SPACE_MD}px;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.purple_soft};
+                color: {Theme.purple};
+            }}
+            """
+        )
+        return btn
+
+    def _initial_text(self):
+        return (
+            "GPT bağlantısı opsiyonel bulut modudur.\n\n"
+            "Çalışması için uygulamayı OPENAI_API_KEY ortam değişkeniyle başlat. "
+            "İstersen OPENAI_MODEL ile modeli değiştirebilirsin."
+        )
+
+    def refresh_status(self):
+        client = OpenAIGptClient()
+        if client.is_configured():
+            self.status.setText(f"GPT hazır · {client.model}")
+        else:
+            self.status.setText("OPENAI_API_KEY yok · yanıt üretmez")
+
+    def submit(self):
+        prompt = self.input.text().strip()
+        if not prompt:
+            return
+        self.input.clear()
+        self.shell.ask_ai(prompt, include_page=True)
+
+    def show_pending(self, prompt):
+        self.refresh_status()
+        self.output.setPlainText(f"Sen: {prompt}\n\nYardımcı hazırlanıyor...")
+
+    def show_answer(self, prompt, answer):
+        self.refresh_status()
+        self.output.setPlainText(f"Sen: {prompt}\n\nYardımcı:\n{answer}")
+
+    def show_error(self, prompt, message):
+        self.refresh_status()
+        self.output.setPlainText(f"Sen: {prompt}\n\nYardımcı çalışmadı:\n{message}")
+
+
 class TodoFloatingPanel(QFrame):
     """F5 floating todo widget; gorev verisi `TodoStore` icinde kalir."""
 
@@ -804,10 +1226,11 @@ class BrowserTab(QWebEngineView):
 class BrowserWindow(QMainWindow):
     """Main browser window."""
 
+    COMPACT_RAIL_WIDTH = 50
     LEFT_SIDEBAR_WIDTH = 238
     RIGHT_SIDEBAR_WIDTH = 258
-    TAB_STRIP_HEIGHT = 50
-    TOOLBAR_HEIGHT = 68
+    TAB_STRIP_HEIGHT = 46
+    TOOLBAR_HEIGHT = 60
     CHROME_SCROLL_HIDE_DELTA = 18
     CHROME_SCROLL_SHOW_DELTA = -12
     CHROME_SCROLL_MIN_Y = 80
@@ -837,6 +1260,10 @@ class BrowserWindow(QMainWindow):
         self.left_sidebar_open = False
         self.right_sidebar_open = False
         self.todo_widget_open = False
+        self.privacy_panel_open = False
+        self.context_bar_open = False
+        self.ai_panel_open = False
+        self._ai_worker = None
         self.browser_chrome_hidden = False
         self._retired_profiles = []
         self._collapsed_groups = set()
@@ -958,9 +1385,19 @@ class BrowserWindow(QMainWindow):
         self.right_sidebar = self._create_right_sidebar()
         self.right_sidebar.setParent(central)
         self.right_sidebar.setVisible(False)
+        self.compact_nav_rail = self._create_compact_nav_rail(central)
         self.todo_widget_open = False
         self.todo_panel = TodoFloatingPanel(central, self.todos, self)
         self.todo_panel.setVisible(False)
+        self.privacy_panel_open = False
+        self.privacy_panel = PrivacyFloatingPanel(central, self)
+        self.privacy_panel.setVisible(False)
+        self.ai_panel_open = False
+        self.assistant_panel = AssistantPanel(central, self)
+        self.assistant_panel.setVisible(False)
+        self.context_bar_open = False
+        self.context_action_bar = ContextActionBar(central, self)
+        self.context_action_bar.setVisible(False)
         self.sidebar_web_view = None
         self.sidebar_web_panel = None
         self.chrome_reveal_hotspot = ChromeRevealHotspot(self, central)
@@ -975,6 +1412,15 @@ class BrowserWindow(QMainWindow):
         height = central.height()
         lw = self.LEFT_SIDEBAR_WIDTH
         rw = self.RIGHT_SIDEBAR_WIDTH
+        if hasattr(self, "compact_nav_rail"):
+            margin = Theme.SPACE_SM
+            self.compact_nav_rail.setGeometry(
+                margin,
+                margin,
+                self.COMPACT_RAIL_WIDTH,
+                max(0, height - margin * 2),
+            )
+            self.compact_nav_rail.raise_()
         lx = 0 if self.left_sidebar_open else -lw
         self.left_sidebar.setGeometry(lx, 0, lw, height)
         rx = central.width() - rw if self.right_sidebar_open else central.width()
@@ -983,6 +1429,12 @@ class BrowserWindow(QMainWindow):
         self.right_sidebar.raise_()
         if hasattr(self, "todo_panel"):
             self._position_todo_panel()
+        if hasattr(self, "privacy_panel"):
+            self._position_privacy_panel()
+        if hasattr(self, "assistant_panel"):
+            self._position_ai_panel()
+        if hasattr(self, "context_action_bar"):
+            self._position_context_action_bar()
         if hasattr(self, "chrome_reveal_hotspot"):
             self._position_chrome_reveal_hotspot()
         if self.sidebar_web_panel is not None:
@@ -1152,8 +1604,13 @@ class BrowserWindow(QMainWindow):
 
     # F7 ozellestirme merkezi: profil bazli kabuk duzeni varsayilanlari.
     DEFAULT_SHELL_LAYOUT = {
-        "toolbar_actions": ["fan", "todo", "history", "theme"],
-        "left_sections": {"nav": True, "web_panels": True, "shortcuts": True},
+        "toolbar_actions": ["fan", "assistant", "todo", "privacy", "history", "theme"],
+        "left_sections": {
+            "workspace_tabs": True,
+            "nav": True,
+            "web_panels": True,
+            "shortcuts": True,
+        },
         "right_sections": {"workspaces": True, "tab_groups": True},
         "newtab_sections": {"search": True, "quick": True, "webmap": True},
     }
@@ -1165,21 +1622,23 @@ class BrowserWindow(QMainWindow):
         degildir — kabuktan kaldirilamazlar.
         """
         return {
-            "fan": ("❖", "Sekme yelpazesi", self.toggle_fan_mode),
+            "fan": ("□", "Sekme yelpazesi", self.toggle_fan_mode),
+            "assistant": ("A", "Yardımcı", self.toggle_ai_panel),
             "todo": ("✓", "Görevler", self.toggle_todo_widget),
-            "history": ("◷", "Geçmiş", lambda: self.open_internal_page("history")),
+            "history": ("○", "Geçmiş", lambda: self.open_internal_page("history")),
+            "privacy": ("◇", "Gizlilik kalkanı", self.toggle_privacy_panel),
             "theme": ("◐", "Açık/koyu tema", self.toggle_theme_mode),
-            "downloads": ("⬇", "İndirilenler", lambda: self.open_internal_page("downloads")),
-            "tasks": ("▦", "Görev Tahtası", lambda: self.open_internal_page("tasks")),
+            "downloads": ("↓", "İndirilenler", lambda: self.open_internal_page("downloads")),
+            "tasks": ("▤", "Görev Tahtası", lambda: self.open_internal_page("tasks")),
             "notes": ("✎", "Notlar", lambda: self.open_internal_page("notes")),
             "split": ("↔", "Bölünmüş görünüm", self.toggle_split_view),
             "pip": ("▣", "Video küçük pencere", self.open_video_popout),
-            "shot": ("▧", "Ekran görüntüsünü kaydet", self.capture_screenshot),
-            "shot-copy": ("▧", "Ekran görüntüsünü panoya kopyala", self.copy_screenshot),
-            "shot-pdf": ("▧", "Tam sayfayı PDF kaydet", self.capture_full_page),
-            "devtools": ("⌁", "Geliştirici araçları", self.open_devtools),
-            "snippets": ("⌘", "Snippet kütüphanesi", self.open_snippet_library),
-            "ua": ("◎", "User-agent", self.open_user_agent_dialog),
+            "shot": ("▢", "Ekran görüntüsünü kaydet", self.capture_screenshot),
+            "shot-copy": ("▢", "Ekran görüntüsünü panoya kopyala", self.copy_screenshot),
+            "shot-pdf": ("▢", "Tam sayfayı PDF kaydet", self.capture_full_page),
+            "devtools": ("<>", "Geliştirici araçları", self.open_devtools),
+            "snippets": ("{}", "Snippet kütüphanesi", self.open_snippet_library),
+            "ua": ("UA", "User-agent", self.open_user_agent_dialog),
             "requests": ("↗", "Ağ istekleri", self.open_request_capture),
         }
 
@@ -1281,11 +1740,11 @@ class BrowserWindow(QMainWindow):
             f"""
             QPushButton {{
                 border: none;
-                border-radius: 10px;
+                border-radius: 9px;
                 background-color: {bg};
                 color: {color};
-                font-size: 13px;
-                font-weight: 800;
+                font-size: 12px;
+                font-weight: 750;
             }}
             QPushButton:hover {{
                 background-color: {hover_bg};
@@ -1366,12 +1825,12 @@ class BrowserWindow(QMainWindow):
         )
         layout = QHBoxLayout(container)
         layout.setContentsMargins(
-            Theme.SPACE_LG, Theme.SPACE_MD, Theme.SPACE_LG, Theme.SPACE_MD
+            14, Theme.SPACE_SM, 14, Theme.SPACE_SM
         )
-        layout.setSpacing(Theme.SPACE_SM)
+        layout.setSpacing(6)
 
         # F2.6: panel toggle'lari rail yerine toolbar'in iki ucunda.
-        self.left_toggle_btn = self._icon_button("☰", "Sol paneli aç/kapat")
+        self.left_toggle_btn = self._icon_button("≡", "Sol paneli aç/kapat")
         self.left_toggle_btn.clicked.connect(
             lambda checked=False: self.toggle_left_sidebar()
         )
@@ -1387,17 +1846,17 @@ class BrowserWindow(QMainWindow):
             layout.addWidget(btn)
 
         self.address_bar = QLineEdit()
-        self.address_bar.setPlaceholderText("Ara veya URL gir")
-        self.address_bar.setFixedHeight(42)
+        self.address_bar.setPlaceholderText("Ara veya adres gir")
+        self.address_bar.setFixedHeight(36)
         self.address_bar.setStyleSheet(
             f"""
             QLineEdit {{
                 border: 1px solid {Theme.border};
-                border-radius: 16px;
+                border-radius: 18px;
                 background-color: {Theme.input};
                 padding: 0 16px;
-                font-size: 14px;
-                font-weight: 550;
+                font-size: 13px;
+                font-weight: 500;
                 color: {Theme.text};
                 selection-background-color: {Theme.purple};
             }}
@@ -1430,7 +1889,7 @@ class BrowserWindow(QMainWindow):
             btn.clicked.connect(lambda checked=False, action=callback: action())
             layout.addWidget(btn)
 
-        more_btn = self._icon_button("⋯", "Daha fazla")
+        more_btn = self._icon_button("•••", "Daha fazla")
         more_menu = QMenu(more_btn)
         more_menu.setStyleSheet(self._menu_style())
         more_menu.addAction("⇅  Sekmeleri üste/alta al", self.toggle_tab_position)
@@ -1439,9 +1898,9 @@ class BrowserWindow(QMainWindow):
                 continue
             more_menu.addAction(f"{glyph}  {label}", callback)
         more_menu.addSeparator()
-        more_menu.addAction("◧  Özelleştir", lambda: self.open_internal_page("customize"))
-        more_menu.addAction("⚙  Ayarlar", lambda: self.open_internal_page("settings"))
-        more_menu.addAction("◌  UI denetimi", lambda: self.open_internal_page("audit"))
+        more_menu.addAction("◇  Özelleştir", lambda: self.open_internal_page("customize"))
+        more_menu.addAction("○  Ayarlar", lambda: self.open_internal_page("settings"))
+        more_menu.addAction("□  UI denetimi", lambda: self.open_internal_page("audit"))
         more_menu.addAction("?  Hakkında", lambda: self.open_internal_page("about"))
         more_btn.setMenu(more_menu)
         layout.addWidget(more_btn)
@@ -1477,7 +1936,7 @@ class BrowserWindow(QMainWindow):
         self._update_profile_chip()
         layout.addWidget(self.profile_chip)
 
-        self.right_toggle_btn = self._icon_button("▦", "Sekme gruplarını aç/kapat")
+        self.right_toggle_btn = self._icon_button("▤", "Sekme gruplarını aç/kapat")
         self.right_toggle_btn.clicked.connect(
             lambda checked=False: self.toggle_right_sidebar()
         )
@@ -1495,7 +1954,7 @@ class BrowserWindow(QMainWindow):
 
     def _toolbar_separator(self):
         line = QFrame()
-        line.setFixedSize(1, 24)
+        line.setFixedSize(1, 22)
         line.setStyleSheet(f"background-color: {Theme.border_soft}; border: none;")
         return line
 
@@ -1597,20 +2056,55 @@ class BrowserWindow(QMainWindow):
         # F7: bolumler profil bazli shell_layout'a gore kurulur; kapali bolum
         # panelden kalkar, verisi korunur (tabx://customize'dan yonetilir).
         left_sections = self.shell_layout["left_sections"]
+        if left_sections.get("workspace_tabs", True):
+            workspace_header = QHBoxLayout()
+            workspace_label = QLabel("Çalışma alanları")
+            workspace_label.setStyleSheet(
+                f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px;"
+            )
+            workspace_header.addWidget(workspace_label)
+            workspace_header.addStretch(1)
+            add_workspace = self._icon_button("+", "Çalışma alanı ekle")
+            add_workspace.setFixedSize(24, 24)
+            add_workspace.clicked.connect(lambda checked=False: self.add_workspace())
+            workspace_header.addWidget(add_workspace)
+            layout.addLayout(workspace_header)
+
+            self.left_workspace_layout = QVBoxLayout()
+            self.left_workspace_layout.setContentsMargins(0, 0, 0, 0)
+            self.left_workspace_layout.setSpacing(6)
+            layout.addLayout(self.left_workspace_layout)
+
+            tabs_label = QLabel("Açık sekmeler")
+            tabs_label.setStyleSheet(
+                f"font-size: 11px; font-weight: 800; color: {Theme.subtle}; letter-spacing: 0.4px; margin-top: 6px;"
+            )
+            layout.addWidget(tabs_label)
+            self.left_tabs_layout = QVBoxLayout()
+            self.left_tabs_layout.setContentsMargins(0, 0, 0, 0)
+            self.left_tabs_layout.setSpacing(2)
+            layout.addLayout(self.left_tabs_layout)
+            self._render_left_workspace_tabs()
+        else:
+            self.left_workspace_layout = None
+            self.left_tabs_layout = None
+
         if left_sections.get("nav", True):
             self._add_sidebar_section(
                 layout,
                 "Gezinti",
                 [
-                    ("⌂", "Ana sayfa", False, lambda: self.open_internal_page("newtab")),
-                    ("⬇", "İndirilenler", False, lambda: self.open_internal_page("downloads")),
-                    ("▦", "Görev Tahtası", False, lambda: self.open_internal_page("tasks")),
+                    ("N", "Ana sayfa", False, lambda: self.open_internal_page("newtab")),
+                    ("↓", "İndirilenler", False, lambda: self.open_internal_page("downloads")),
+                    ("▤", "Görev Tahtası", False, lambda: self.open_internal_page("tasks")),
                     ("✎", "Notlar", False, lambda: self.open_internal_page("notes")),
+                    ("A", "Yardımcı", False, self.toggle_ai_panel),
+                    ("◇", "Gizlilik kalkanı", False, self.toggle_privacy_panel),
                     ("☆", "Favoriler", False, lambda: self.open_internal_page("bookmarks")),
-                    ("◷", "Geçmiş", False, lambda: self.open_internal_page("history")),
-                    ("◧", "Özelleştir", False, lambda: self.open_internal_page("customize")),
-                    ("⚙", "Ayarlar", False, lambda: self.open_internal_page("settings")),
-                    ("◌", "UI denetimi", False, lambda: self.open_internal_page("audit")),
+                    ("○", "Geçmiş", False, lambda: self.open_internal_page("history")),
+                    ("□", "Özelleştir", False, lambda: self.open_internal_page("customize")),
+                    ("○", "Ayarlar", False, lambda: self.open_internal_page("settings")),
+                    ("□", "UI denetimi", False, lambda: self.open_internal_page("audit")),
                 ],
             )
         if left_sections.get("web_panels", True):
@@ -1733,6 +2227,82 @@ class BrowserWindow(QMainWindow):
 
         return sidebar
 
+    def _create_compact_nav_rail(self, parent):
+        """Dar, gercek aksiyonlara bagli sol navigasyon rail'i.
+
+        F7 tasarim donusumu: paneli acmadan sik kullanilan yuzeylere ulasir.
+        Layout'a dahil edilmez; web icerigini daraltmadan overlay olarak durur.
+        """
+        rail = QFrame(parent)
+        rail.setObjectName("compactNavRail")
+        rail.setFixedWidth(self.COMPACT_RAIL_WIDTH)
+        rail.setStyleSheet(
+            f"""
+            QFrame#compactNavRail {{
+                background-color: {Theme.glass_strong};
+                border: 1px solid {Theme.glass_border};
+                border-radius: {Theme.RADIUS_LG}px;
+            }}
+            """
+        )
+        layout = QVBoxLayout(rail)
+        layout.setContentsMargins(7, 8, 7, 8)
+        layout.setSpacing(7)
+
+        brand = self._rail_action_button("N", "TabX paneli", self.toggle_left_sidebar, primary=True)
+        layout.addWidget(brand)
+        layout.addSpacing(Theme.SPACE_SM)
+
+        for label, tooltip, callback in [
+            ("N", "Ana sayfa", lambda: self.open_internal_page("newtab")),
+            ("▤", "Çalışma alanları ve sekme grupları", self.toggle_right_sidebar),
+            ("○", "Geçmiş", lambda: self.open_internal_page("history")),
+            ("↓", "İndirilenler", lambda: self.open_internal_page("downloads")),
+            ("✎", "Notlar", lambda: self.open_internal_page("notes")),
+            ("A", "Yardımcı", self.toggle_ai_panel),
+            ("◇", "Gizlilik kalkanı", self.toggle_privacy_panel),
+            ("▢", "Ekran görüntüsü", self.capture_screenshot),
+            ("□", "Özelleştir", lambda: self.open_internal_page("customize")),
+            ("○", "Ayarlar", lambda: self.open_internal_page("settings")),
+        ]:
+            layout.addWidget(self._rail_action_button(label, tooltip, callback))
+
+        layout.addStretch(1)
+        layout.addWidget(
+            self._rail_action_button("+", "Yeni sekme", lambda: self.add_new_tab())
+        )
+        rail.show()
+        return rail
+
+    def _rail_action_button(self, label, tooltip, callback, primary=False):
+        btn = QPushButton(label)
+        btn.setToolTip(tooltip)
+        btn.setFixedSize(34, 34)
+        bg = Theme.purple_soft if primary else "transparent"
+        color = Theme.purple if primary else Theme.muted
+        border = Theme.glass_border if primary else "transparent"
+        btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                border: 1px solid {border};
+                border-radius: 11px;
+                background-color: {bg};
+                color: {color};
+                font-size: 13px;
+                font-weight: 800;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.purple_soft};
+                color: {Theme.purple};
+            }}
+            QPushButton:pressed {{
+                background-color: {Theme.border_soft};
+            }}
+            """
+        )
+        btn.clicked.connect(lambda checked=False: callback())
+        return btn
+
     def toggle_left_sidebar(self, open_state=None):
         if open_state is None:
             open_state = not self.left_sidebar_open
@@ -1827,11 +2397,126 @@ class BrowserWindow(QMainWindow):
         elif delta < self.CHROME_SCROLL_SHOW_DELTA or y <= 4:
             self.show_browser_chrome()
 
+    def _handle_selection_changed(self, view):
+        if view is not self.current_view:
+            return
+        selected = view.page().selectedText().strip()
+        if hasattr(self, "context_action_bar"):
+            self.context_action_bar.set_selection(selected)
+        self._slide_context_action_bar(bool(selected))
+
+    def _position_context_action_bar(self):
+        central = self.centralWidget()
+        if not central or not hasattr(self, "context_action_bar"):
+            return
+        margin = Theme.SPACE_LG
+        open_x = max(margin, (central.width() - self.context_action_bar.width()) // 2)
+        open_y = central.height() - self.context_action_bar.height() - margin
+        closed_y = central.height() + margin
+        self.context_action_bar.move(open_x, open_y if self.context_bar_open else closed_y)
+        self.context_action_bar.raise_()
+
+    def _slide_context_action_bar(self, open_state):
+        central = self.centralWidget()
+        if not central or not hasattr(self, "context_action_bar"):
+            return
+        open_state = bool(open_state)
+        if self.context_bar_open == open_state and self.context_action_bar.isVisible() == open_state:
+            return
+        self.context_bar_open = open_state
+        margin = Theme.SPACE_LG
+        open_pos = QPoint(
+            max(margin, (central.width() - self.context_action_bar.width()) // 2),
+            central.height() - self.context_action_bar.height() - margin,
+        )
+        closed_pos = QPoint(open_pos.x(), central.height() + margin)
+        self.context_action_bar.raise_()
+        if not Motion.enabled:
+            self.context_action_bar.move(open_pos if open_state else closed_pos)
+            self.context_action_bar.setVisible(open_state)
+            return
+        if open_state:
+            self.context_action_bar.move(closed_pos)
+            self.context_action_bar.setVisible(True)
+            animate(
+                self.context_action_bar, b"pos", closed_pos, open_pos,
+                duration=Motion.BASE, easing=Motion.ENTER,
+            )
+        else:
+            def _hide():
+                self.context_action_bar.setVisible(False)
+
+            animate(
+                self.context_action_bar, b"pos", self.context_action_bar.pos(), closed_pos,
+                duration=Motion.BASE, easing=Motion.EXIT, on_finished=_hide,
+            )
+
     def toggle_todo_widget(self, open_state=None):
         if open_state is None:
             open_state = not self.todo_widget_open
         self.todo_widget_open = bool(open_state)
         self._slide_todo_panel(self.todo_widget_open)
+
+    def toggle_privacy_panel(self, open_state=None):
+        if open_state is None:
+            open_state = not self.privacy_panel_open
+        self.privacy_panel_open = bool(open_state)
+        self._slide_privacy_panel(self.privacy_panel_open)
+
+    def toggle_ai_panel(self, open_state=None):
+        if open_state is None:
+            open_state = not self.ai_panel_open
+        self.ai_panel_open = bool(open_state)
+        self._slide_ai_panel(self.ai_panel_open)
+
+    def ask_ai(self, prompt, include_page=True):
+        if not hasattr(self, "assistant_panel"):
+            return
+        self.toggle_ai_panel(True)
+        self.assistant_panel.show_pending(prompt)
+        if self._ai_worker is not None and self._ai_worker.isRunning():
+            self.assistant_panel.show_error(prompt, "Önceki GPT isteği hâlâ çalışıyor.")
+            return
+        if not OpenAIGptClient().is_configured():
+            self.assistant_panel.show_error(
+                prompt,
+                "OPENAI_API_KEY tanımlı değil. Uygulamayı bu ortam değişkeniyle başlatınca GPT yanıtı üretilecek.",
+            )
+            return
+        if include_page and self.current_view is not None:
+            script = """
+            (() => {
+              const title = document.title || '';
+              const url = location.href || '';
+              const text = (document.body && document.body.innerText) ? document.body.innerText : '';
+              return `Başlık: ${title}\\nURL: ${url}\\n\\n${text.slice(0, 6500)}`;
+            })();
+            """
+            self.current_view.page().runJavaScript(
+                script,
+                lambda context, request=prompt: self._start_ai_worker(request, str(context or "")),
+            )
+        else:
+            self._start_ai_worker(prompt, "")
+
+    def _start_ai_worker(self, prompt, page_context):
+        worker = GptRequestWorker(prompt, page_context, self)
+        self._ai_worker = worker
+        worker.succeeded.connect(lambda answer, request=prompt: self._finish_ai_success(request, answer))
+        worker.failed.connect(lambda message, request=prompt: self._finish_ai_error(request, message))
+        worker.finished.connect(self._clear_ai_worker)
+        worker.start()
+
+    def _finish_ai_success(self, prompt, answer):
+        if hasattr(self, "assistant_panel"):
+            self.assistant_panel.show_answer(prompt, answer)
+
+    def _finish_ai_error(self, prompt, message):
+        if hasattr(self, "assistant_panel"):
+            self.assistant_panel.show_error(prompt, message)
+
+    def _clear_ai_worker(self):
+        self._ai_worker = None
 
     def _position_todo_panel(self):
         central = self.centralWidget()
@@ -1873,6 +2558,112 @@ class BrowserWindow(QMainWindow):
 
             animate(
                 self.todo_panel, b"pos", self.todo_panel.pos(), closed_pos,
+                duration=Motion.BASE, easing=Motion.EXIT, on_finished=_hide,
+            )
+
+    def _position_privacy_panel(self):
+        central = self.centralWidget()
+        if not central or not hasattr(self, "privacy_panel"):
+            return
+        margin = Theme.SPACE_LG
+        top_offset = self.TAB_STRIP_HEIGHT + self.TOOLBAR_HEIGHT + margin
+        if self.browser_chrome_hidden:
+            top_offset = margin
+        open_x = central.width() - self.privacy_panel.width() - margin
+        closed_x = central.width() + margin
+        self.privacy_panel.move(
+            open_x if self.privacy_panel_open else closed_x,
+            max(margin, top_offset),
+        )
+        self.privacy_panel.raise_()
+
+    def _position_ai_panel(self):
+        central = self.centralWidget()
+        if not central or not hasattr(self, "assistant_panel"):
+            return
+        margin = Theme.SPACE_LG
+        top_offset = self.TAB_STRIP_HEIGHT + self.TOOLBAR_HEIGHT + margin
+        if self.browser_chrome_hidden:
+            top_offset = margin
+        height = min(540, max(360, central.height() - top_offset - margin))
+        self.assistant_panel.setFixedHeight(height)
+        open_x = central.width() - self.assistant_panel.width() - margin
+        closed_x = central.width() + margin
+        self.assistant_panel.move(
+            open_x if self.ai_panel_open else closed_x,
+            max(margin, top_offset),
+        )
+        self.assistant_panel.raise_()
+
+    def _slide_ai_panel(self, open_state):
+        central = self.centralWidget()
+        if not central or not hasattr(self, "assistant_panel"):
+            return
+        self.assistant_panel.refresh_status()
+        margin = Theme.SPACE_LG
+        top_offset = self.TAB_STRIP_HEIGHT + self.TOOLBAR_HEIGHT + margin
+        if self.browser_chrome_hidden:
+            top_offset = margin
+        height = min(540, max(360, central.height() - top_offset - margin))
+        self.assistant_panel.setFixedHeight(height)
+        open_pos = QPoint(
+            central.width() - self.assistant_panel.width() - margin,
+            max(margin, top_offset),
+        )
+        closed_pos = QPoint(central.width() + margin, open_pos.y())
+        self.assistant_panel.raise_()
+        if not Motion.enabled:
+            self.assistant_panel.move(open_pos if open_state else closed_pos)
+            self.assistant_panel.setVisible(open_state)
+            return
+        if open_state:
+            self.assistant_panel.move(closed_pos)
+            self.assistant_panel.setVisible(True)
+            animate(
+                self.assistant_panel, b"pos", closed_pos, open_pos,
+                duration=Motion.BASE, easing=Motion.ENTER,
+            )
+        else:
+            def _hide():
+                self.assistant_panel.setVisible(False)
+
+            animate(
+                self.assistant_panel, b"pos", self.assistant_panel.pos(), closed_pos,
+                duration=Motion.BASE, easing=Motion.EXIT, on_finished=_hide,
+            )
+
+    def _slide_privacy_panel(self, open_state):
+        central = self.centralWidget()
+        if not central or not hasattr(self, "privacy_panel"):
+            return
+        self.privacy_panel.render()
+        margin = Theme.SPACE_LG
+        top_offset = self.TAB_STRIP_HEIGHT + self.TOOLBAR_HEIGHT + margin
+        if self.browser_chrome_hidden:
+            top_offset = margin
+        open_pos = QPoint(
+            central.width() - self.privacy_panel.width() - margin,
+            max(margin, top_offset),
+        )
+        closed_pos = QPoint(central.width() + margin, open_pos.y())
+        self.privacy_panel.raise_()
+        if not Motion.enabled:
+            self.privacy_panel.move(open_pos if open_state else closed_pos)
+            self.privacy_panel.setVisible(open_state)
+            return
+        if open_state:
+            self.privacy_panel.move(closed_pos)
+            self.privacy_panel.setVisible(True)
+            animate(
+                self.privacy_panel, b"pos", closed_pos, open_pos,
+                duration=Motion.BASE, easing=Motion.ENTER,
+            )
+        else:
+            def _hide():
+                self.privacy_panel.setVisible(False)
+
+            animate(
+                self.privacy_panel, b"pos", self.privacy_panel.pos(), closed_pos,
                 duration=Motion.BASE, easing=Motion.EXIT, on_finished=_hide,
             )
 
@@ -1948,6 +2739,7 @@ class BrowserWindow(QMainWindow):
             PaletteCommand("Ayarlar", "Görünüm", lambda: self.open_internal_page("settings")),
             PaletteCommand("UI denetimi", "Görünüm", lambda: self.open_internal_page("audit")),
             PaletteCommand("Açık/koyu tema", "Görünüm", self.toggle_theme_mode),
+            PaletteCommand("Yardımcı", "AI", self.toggle_ai_panel),
             PaletteCommand("Sekme yelpazesi", "Görünüm", self.toggle_fan_mode),
             PaletteCommand("Bölünmüş görünüm", "Görünüm", self.toggle_split_view),
             PaletteCommand("Video küçük pencere", "Görünüm", self.open_video_popout),
@@ -2074,11 +2866,15 @@ class BrowserWindow(QMainWindow):
         self.ad_block_enabled = not self.ad_block_enabled
         self.privacy.set_ad_block_enabled(self.ad_block_enabled)
         self._save_ui_state()
+        if hasattr(self, "privacy_panel"):
+            self.privacy_panel.render()
 
     def toggle_https_upgrade(self):
         self.https_upgrade_enabled = not self.https_upgrade_enabled
         self.privacy.set_https_upgrade_enabled(self.https_upgrade_enabled)
         self._save_ui_state()
+        if hasattr(self, "privacy_panel"):
+            self.privacy_panel.render()
 
     def set_search_engine(self, engine):
         if engine not in UiStateStore.search_engines or engine == self.search_engine:
@@ -2250,6 +3046,7 @@ class BrowserWindow(QMainWindow):
         self._reset_tabs()
         self._restore_session()
         self._render_workspaces()
+        self._render_left_workspace_tabs()
         self._render_web_panels()
         self._update_profile_chip()
         # Hedef profilin kabuk duzeni farkliysa toolbar/paneller yeniden kurulur.
@@ -2273,6 +3070,7 @@ class BrowserWindow(QMainWindow):
         self._reset_tabs()
         self._restore_session()
         self._render_workspaces()
+        self._render_left_workspace_tabs()
 
     def remove_workspace(self, name):
         if name == DEFAULT_WORKSPACE:
@@ -2288,6 +3086,7 @@ class BrowserWindow(QMainWindow):
             self._reset_tabs()
             self._restore_session()
         self._render_workspaces()
+        self._render_left_workspace_tabs()
 
     def _reset_tabs(self):
         """Tum acik sekmeleri ve view'leri kaldirir (workspace/profil gecisi)."""
@@ -2304,6 +3103,7 @@ class BrowserWindow(QMainWindow):
                 view.deleteLater()
         self.current_view = None
         self.tabs.reset()
+        self._render_left_workspace_tabs()
 
     def _render_workspaces(self):
         """F2.6: workspace'ler yatay cip akisi — mor dolgu yalnizca aktifte.
@@ -2379,6 +3179,108 @@ class BrowserWindow(QMainWindow):
         menu.setStyleSheet(self._menu_style())
         menu.addAction("Alanı sil", lambda ws=name: self.remove_workspace(ws))
         menu.exec(chip.mapToGlobal(pos))
+
+    def _render_left_workspace_tabs(self):
+        """F7 tasarim donusumu: sol panelde workspace + acik sekme ozeti."""
+        if getattr(self, "left_workspace_layout", None) is None:
+            return
+        self._clear_layout(self.left_workspace_layout)
+        self._clear_layout(self.left_tabs_layout)
+
+        workspaces = SessionStore.workspaces(self.profile_name)
+        for name in workspaces[:4]:
+            self.left_workspace_layout.addWidget(self._left_workspace_row(name))
+        if len(workspaces) > 4:
+            more = QLabel(f"+{len(workspaces) - 4} çalışma alanı sağ panelde")
+            more.setStyleSheet(
+                f"font-size: 11px; color: {Theme.subtle}; padding: 0 4px;"
+            )
+            self.left_workspace_layout.addWidget(more)
+
+        active_index = self.tabs.currentIndex() if hasattr(self, "tabs") else 0
+        visible_tabs = list(enumerate(getattr(self.tabs, "_tabs", [])))[:7]
+        if not visible_tabs:
+            empty = QLabel("Açık sekme yok.")
+            empty.setStyleSheet(
+                f"font-size: 11px; color: {Theme.subtle}; padding: 4px;"
+            )
+            self.left_tabs_layout.addWidget(empty)
+            return
+        for index, tab in visible_tabs:
+            self.left_tabs_layout.addWidget(
+                self._left_tab_row(index, tab.get("title", "Yeni Sekme"), index == active_index)
+            )
+        remaining = self.tabs.count() - len(visible_tabs)
+        if remaining > 0:
+            more = QLabel(f"+{remaining} sekme daha")
+            more.setStyleSheet(
+                f"font-size: 11px; color: {Theme.subtle}; padding: 2px 4px;"
+            )
+            self.left_tabs_layout.addWidget(more)
+
+    def _left_workspace_row(self, name):
+        active = name == self.workspace
+        row = QPushButton(name)
+        row.setFixedHeight(30)
+        row.setCursor(Qt.CursorShape.PointingHandCursor)
+        row.setStyleSheet(
+            f"""
+            QPushButton {{
+                border: 1px solid {Theme.border_soft if not active else Theme.glass_border};
+                border-radius: 11px;
+                background-color: {Theme.purple_soft if active else 'transparent'};
+                color: {Theme.purple if active else Theme.muted};
+                font-size: 12px;
+                font-weight: {760 if active else 650};
+                text-align: left;
+                padding: 0 {Theme.SPACE_MD}px;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.purple_soft if active else Theme.panel_alt};
+                color: {Theme.purple if active else Theme.text};
+            }}
+            """
+        )
+        row.clicked.connect(lambda checked=False, ws=name: self.switch_workspace(ws))
+        return row
+
+    def _left_tab_row(self, index, title, active):
+        row = QFrame()
+        row.setFixedHeight(30)
+        row.setCursor(Qt.CursorShape.PointingHandCursor)
+        row.setStyleSheet(
+            f"""
+            QFrame {{
+                background-color: {Theme.purple_soft if active else 'transparent'};
+                border-radius: 10px;
+            }}
+            QFrame:hover {{
+                background-color: {Theme.purple_soft if active else Theme.panel_alt};
+            }}
+            """
+        )
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(8, 0, 8, 0)
+        layout.setSpacing(8)
+        marker = QLabel("●" if active else "○")
+        marker.setFixedWidth(14)
+        marker.setStyleSheet(
+            f"font-size: 9px; color: {Theme.purple if active else Theme.subtle}; background: transparent;"
+        )
+        label = QLabel(title)
+        label.setStyleSheet(
+            f"font-size: 12px; font-weight: {720 if active else 620}; color: {Theme.purple if active else Theme.muted}; background: transparent;"
+        )
+        layout.addWidget(marker)
+        layout.addWidget(label, 1)
+
+        def handle_press(event, tab_index=index):
+            if event.button() == Qt.MouseButton.LeftButton:
+                self.tabs.setCurrentIndex(tab_index)
+            QFrame.mousePressEvent(row, event)
+
+        row.mousePressEvent = handle_press
+        return row
 
     def _rebuild_visual_shell(self):
         # Acik sekmeler kaybolmasin: oturumu kaydet, kabugu kur, geri yukle.
@@ -2889,16 +3791,16 @@ class BrowserWindow(QMainWindow):
         # Adres cubugu toolbar'daki tek cerceveli eleman olarak kalir.
         btn = QPushButton(label)
         btn.setToolTip(tooltip)
-        btn.setFixedSize(36, 36)
+        btn.setFixedSize(34, 34)
         btn.setStyleSheet(
             f"""
             QPushButton {{
                 border: none;
-                border-radius: 10px;
+                border-radius: 9px;
                 background-color: transparent;
                 color: {Theme.muted};
-                font-size: 13px;
-                font-weight: 800;
+                font-size: 12px;
+                font-weight: 750;
             }}
             QPushButton:hover {{
                 background-color: {Theme.panel_alt};
@@ -2942,6 +3844,9 @@ class BrowserWindow(QMainWindow):
         new_view.page().scrollPositionChanged.connect(
             lambda position, view=new_view: self._handle_scroll_position(view, position)
         )
+        new_view.page().selectionChanged.connect(
+            lambda view=new_view: self._handle_selection_changed(view)
+        )
         self.privacy.attach_tab(new_view)
         self.mouse_gestures.attach(new_view)
 
@@ -2958,6 +3863,7 @@ class BrowserWindow(QMainWindow):
         self.web_container.setCurrentWidget(new_view)
         self.tabs.setCurrentIndex(index)
         self.update_address_bar(url)
+        self._render_left_workspace_tabs()
         return index
 
     def close_tab(self, index):
@@ -2986,11 +3892,15 @@ class BrowserWindow(QMainWindow):
             self.current_view = self.tabs._views[new_index]
             self._switch_view_with_transition(self.current_view, direction=-1, ghost=ghost)
             self.update_address_bar(self.current_view.url())
+            self._render_left_workspace_tabs()
         elif ghost is not None:
             ghost.deleteLater()
 
     def handle_tab_activated(self, index):
         self._close_split_view()
+        if hasattr(self, "context_action_bar"):
+            self.context_action_bar.set_selection("")
+            self._slide_context_action_bar(False)
         if hasattr(self.tabs, "_views") and index < len(self.tabs._views):
             new_view = self.tabs._views[index]
             if new_view:
@@ -3003,6 +3913,7 @@ class BrowserWindow(QMainWindow):
                 self.current_view = new_view
                 self._switch_view_with_transition(new_view, direction=direction)
                 self.update_address_bar(new_view.url())
+                self._render_left_workspace_tabs()
 
     def _switch_view_with_transition(self, new_view, direction=1, ghost=None):
         """Aktif view degisimini snapshot deseniyle oynatir (DESIGN_SYSTEM §4).
@@ -3122,6 +4033,7 @@ class BrowserWindow(QMainWindow):
         elif clean_title.startswith("data:text/html"):
             clean_title = "Yeni Sekme"
         self.tabs.setTabText(index, clean_title)
+        self._render_left_workspace_tabs()
 
     def _handle_icon_changed(self, view, icon):
         try:
@@ -3811,6 +4723,7 @@ class BrowserWindow(QMainWindow):
                 f"tabx://customize/section?group=left_sections&key={section}",
             )
             for section, label in (
+                ("workspace_tabs", "Çalışma alanları ve açık sekmeler"),
                 ("nav", "Gezinti bağlantıları"),
                 ("web_panels", "Web panelleri"),
                 ("shortcuts", "Özel kısayollar"),
@@ -3957,9 +4870,9 @@ class BrowserWindow(QMainWindow):
                 <p>Tarayıcının düzenlenebilir bölgeleri. Tıklayınca ilgili karta gider.</p>
                 <div class="mini">
                   <div class="mini-toolbar zone" data-target="card-toolbar">
-                    <span>☰</span><span>←</span><span>↻</span>
+                    <span>≡</span><span>←</span><span>↻</span>
                     <span class="mini-address"></span>
-                    {toolbar_glyphs}<span>⋯</span><span>▦</span>
+                    {toolbar_glyphs}<span>•••</span><span>▤</span>
                   </div>
                   <div class="mini-body">
                     <div class="mini-side l zone" data-target="card-panels">
@@ -4851,7 +5764,6 @@ class BrowserWindow(QMainWindow):
               --blue: __BLUE__;
               --blue-soft: __BLUE_SOFT__;
               --shadow: __SHADOW__;
-              --map-dot: __MAP_DOT__;
               --page-top: __PAGE_TOP__;
               --motion-fast: __MOTION_FAST__ms;
             }
@@ -4859,73 +5771,68 @@ class BrowserWindow(QMainWindow):
             body {
               margin: 0;
               min-height: 100vh;
-              font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, Arial, sans-serif;
+              font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", sans-serif;
               color: var(--text);
-              background:
-                radial-gradient(circle at 26% 16%, color-mix(in srgb, var(--purple) 12%, transparent), transparent 24%),
-                radial-gradient(circle at 78% 12%, color-mix(in srgb, var(--blue) 10%, transparent), transparent 25%),
-                linear-gradient(180deg, var(--page-top) 0%, var(--bg) 100%);
+              background: linear-gradient(180deg, var(--page-top) 0%, var(--bg) 100%);
               overflow-x: hidden;
             }
-            .map {
+            /* Alt bolumde cok hafif, soyut dalga formlari — icerigin onune gecmez. */
+            .waves {
               position: fixed;
-              inset: 38px 52px auto 52px;
-              height: 230px;
-              opacity: .58;
-              background-image: radial-gradient(var(--map-dot) 1px, transparent 1.4px);
-              background-size: 9px 9px;
-              mask-image: radial-gradient(ellipse at center, black 0%, transparent 72%);
+              left: 0;
+              right: 0;
+              bottom: 0;
+              height: 30vh;
+              min-height: 170px;
+              pointer-events: none;
+              z-index: 0;
             }
+            .waves svg { width: 100%; height: 100%; display: block; }
+            .waves .w1 { fill: color-mix(in srgb, var(--blue) 7%, transparent); }
+            .waves .w2 { fill: color-mix(in srgb, var(--blue) 4%, transparent); }
+            .waves .w3 { fill: color-mix(in srgb, var(--muted) 5%, transparent); }
             main {
               position: relative;
               z-index: 1;
               width: min(900px, calc(100vw - 80px));
               margin: 0 auto;
-              padding: 48px 0 24px;
+              padding: 72px 0 24px;
             }
             .hero { text-align: center; }
             .logo {
-              width: 58px;
-              height: 58px;
+              width: 64px;
+              height: 64px;
               display: grid;
               place-items: center;
-              margin: 0 auto 12px;
-              border-radius: 22px;
-              background: linear-gradient(145deg, var(--card), var(--purple-soft));
-              border: 1px solid color-mix(in srgb, var(--purple) 22%, transparent);
-              box-shadow: 0 18px 48px var(--shadow);
-              color: var(--purple);
-              font-weight: 900;
-              letter-spacing: 0;
+              margin: 0 auto 16px;
+              border-radius: 20px;
+              background: var(--card);
+              border: 1px solid var(--line);
+              box-shadow: 0 1px 2px var(--shadow), 0 12px 32px var(--shadow);
             }
             h1 {
-              margin: 0;
-              font-size: 36px;
-              line-height: 1.05;
-              letter-spacing: 0;
-            }
-            .subtitle {
-              margin: 10px 0 20px;
-              color: var(--muted);
-              font-size: 15px;
-              font-weight: 600;
+              margin: 0 0 24px;
+              font-size: 30px;
+              line-height: 1.1;
+              font-weight: 700;
+              letter-spacing: -0.02em;
             }
             .search {
               display: flex;
               align-items: center;
               gap: 12px;
-              width: min(560px, 100%);
-              height: 58px;
+              width: min(600px, 100%);
+              height: 56px;
               margin: 0 auto;
-              padding: 0 18px;
-              border-radius: 22px;
+              padding: 0 8px 0 20px;
+              border-radius: 999px;
               background: var(--card);
               border: 1px solid var(--line);
-              box-shadow: 0 20px 60px var(--shadow);
+              box-shadow: 0 1px 2px var(--shadow), 0 14px 40px var(--shadow);
               transition: border-color var(--motion-fast) ease-out;
             }
             .search:focus-within { border-color: var(--purple); }
-            .search span { color: var(--purple); font-weight: 900; }
+            .search .find-icon { color: var(--muted); display: grid; place-items: center; }
             .search input {
               border: 0;
               outline: 0;
@@ -4934,34 +5841,51 @@ class BrowserWindow(QMainWindow):
               font-size: 15px;
               color: var(--text);
             }
+            .search input::placeholder { color: var(--muted); }
+            .search .go {
+              width: 40px;
+              height: 40px;
+              flex: none;
+              border: 0;
+              border-radius: 999px;
+              background: var(--purple);
+              color: #ffffff;
+              display: grid;
+              place-items: center;
+              cursor: pointer;
+              transition: filter var(--motion-fast) ease-out;
+            }
+            .search .go:hover { filter: brightness(1.06); }
             .quick-heading, .webmap-title {
               width: min(680px, 100%);
-              margin: 32px auto 12px;
-              font-size: 13px;
-              font-weight: 800;
+              margin: 40px auto 12px;
+              font-size: 12px;
+              font-weight: 600;
+              color: var(--muted);
+              letter-spacing: 0.04em;
+              text-transform: uppercase;
             }
-            .quick-heading { display: flex; align-items: center; justify-content: space-between; }
-            .quick-add, .quick-remove {
+            .quick-remove {
               color: var(--muted);
               text-decoration: none;
               font-size: 12px;
-              font-weight: 800;
+              font-weight: 700;
             }
-            .quick-add:hover, .quick-remove:hover { color: var(--purple); }
+            .quick-remove:hover { color: var(--purple); }
             .quick {
               width: min(680px, 100%);
               display: grid;
               grid-template-columns: repeat(6, 1fr);
-              gap: 14px;
+              gap: 16px;
               margin: 0 auto;
             }
             .quick-card { position: relative; min-width: 0; }
             .card {
               height: 92px;
-              border-radius: 18px;
+              border-radius: 16px;
               border: 1px solid var(--line);
               background: var(--card);
-              box-shadow: 0 16px 38px var(--shadow);
+              box-shadow: 0 1px 2px var(--shadow), 0 10px 26px var(--shadow);
               display: grid;
               place-items: center;
               gap: 8px;
@@ -4969,8 +5893,20 @@ class BrowserWindow(QMainWindow):
               text-decoration: none;
               color: var(--text);
               font-size: 12px;
-              font-weight: 700;
+              font-weight: 600;
+              transition: border-color var(--motion-fast) ease-out;
             }
+            .card:hover { border-color: color-mix(in srgb, var(--purple) 40%, var(--line)); }
+            /* Son kart: yeni site eklemek icin sade arti karti. */
+            .card-add {
+              color: var(--muted);
+              font-size: 24px;
+              font-weight: 400;
+              box-shadow: none;
+              border-style: dashed;
+              background: transparent;
+            }
+            .card-add:hover { color: var(--purple); background: var(--card); }
             .quick-remove {
               position: absolute;
               top: 5px;
@@ -5012,8 +5948,8 @@ class BrowserWindow(QMainWindow):
               touch-action: none;
               user-select: none;
             }
-            svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-            path {
+            .network > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+            .network path {
               fill: none;
               stroke: color-mix(in srgb, var(--purple) 46%, transparent);
               stroke-width: 1.5;
@@ -5084,12 +6020,22 @@ class BrowserWindow(QMainWindow):
           </style>
         </head>
         <body>
-          <div class="map"></div>
+          <div class="waves" aria-hidden="true">
+            <svg viewBox="0 0 1440 260" preserveAspectRatio="none">
+              <path class="w3" d="M0,140 C240,90 480,190 720,150 C960,110 1200,180 1440,120 L1440,260 L0,260 Z" />
+              <path class="w2" d="M0,190 C260,140 520,230 780,190 C1040,150 1260,220 1440,170 L1440,260 L0,260 Z" />
+              <path class="w1" d="M0,230 C280,190 560,255 840,225 C1100,198 1300,245 1440,215 L1440,260 L0,260 Z" />
+            </svg>
+          </div>
           <main>
             <section class="hero">
-              <div class="logo">TX</div>
+              <div class="logo" aria-hidden="true">
+                <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+                  <rect x="2" y="2" width="26" height="26" rx="8" stroke="__PURPLE__" stroke-width="2.4" />
+                  <circle cx="15" cy="15" r="5" fill="__PURPLE__" />
+                </svg>
+              </div>
               <h1>TabX</h1>
-              <p class="subtitle">Web'i hızlı, sade ve akıllı keşfet.</p>
               __SEARCH_FORM__
             </section>
 
@@ -5209,8 +6155,16 @@ class BrowserWindow(QMainWindow):
         newtab_sections = self.shell_layout["newtab_sections"]
         search_form = (
             '<form class="search" id="search">'
-            "<span>TX</span>"
-            '<input id="query" autofocus placeholder="Ara veya URL gir" />'
+            '<span class="find-icon" aria-hidden="true">'
+            '<svg width="17" height="17" viewBox="0 0 17 17" fill="none">'
+            '<circle cx="7.5" cy="7.5" r="5.2" stroke="currentColor" stroke-width="1.7" />'
+            '<path d="M11.6 11.6 L15 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />'
+            "</svg></span>"
+            '<input id="query" autofocus placeholder="Bir şey ara ya da adres gir" />'
+            '<button class="go" type="submit" title="Git" aria-label="Git">'
+            '<svg width="16" height="16" viewBox="0 0 16 16" fill="none">'
+            '<path d="M2.5 8 H13 M9 3.8 L13.4 8 L9 12.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />'
+            "</svg></button>"
             "</form>"
             if newtab_sections.get("search", True)
             else ""
@@ -5219,11 +6173,16 @@ class BrowserWindow(QMainWindow):
         if newtab_sections.get("quick", True):
             quick_cards = "".join(
                 f'<div class="quick-card"><a class="card" href="{html_module.escape(url, quote=True)}"><div class="mark">{html_module.escape(icon)}</div>{html_module.escape(title)}</a><a class="quick-remove" href="tabx://newtab/remove-speed-dial?index={index}" title="Kısayolu kaldır">×</a></div>'
-                for index, (icon, title, url) in enumerate(self.speed_dials[:6])
+                for index, (icon, title, url) in enumerate(self.speed_dials[:5])
+            )
+            # Son kart her zaman "yeni site ekle" — sade arti karti.
+            quick_cards += (
+                '<div class="quick-card">'
+                '<a class="card card-add" href="tabx://newtab/add-speed-dial" title="Yeni site ekle">+</a>'
+                "</div>"
             )
             quick_section = (
-                '<div class="quick-heading"><span>Hızlı Erişim</span>'
-                '<a class="quick-add" href="tabx://newtab/add-speed-dial">+ Ekle</a></div>'
+                '<div class="quick-heading"><span>Hızlı Erişim</span></div>'
                 f'<section class="quick">{quick_cards}</section>'
             )
         webmap_section = ""
@@ -5248,7 +6207,6 @@ class BrowserWindow(QMainWindow):
             <div class="status"><span>TX</span><div class="trail"></div><span>Düğüme tıkla: site açılır · sürükle: yerleşimi düzenle</span></div>
             """
         page_top = Theme.panel
-        map_dot = Theme.mix(Theme.border, Theme.subtle, 0.45)
         return (
             template.replace("__BG__", Theme.bg)
             .replace("__SEARCH_FORM__", search_form)
@@ -5268,7 +6226,6 @@ class BrowserWindow(QMainWindow):
             .replace("__BLUE__", Theme.blue)
             .replace("__BLUE_SOFT__", Theme.blue_soft)
             .replace("__SHADOW__", Theme.shadow)
-            .replace("__MAP_DOT__", map_dot)
             .replace("__PAGE_TOP__", page_top)
             .replace("__MOTION_FAST__", str(Motion.FAST if Motion.enabled else 0))
         )

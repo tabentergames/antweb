@@ -4,6 +4,58 @@ Son guncelleme: 2026-07-14
 
 ## Son kararlar
 
+- **F7 yeni nesil sade tasarim donusumu basladi (2026-07-16):**
+  Kullanici tarafindan verilen AI destekli ama AI-merkezli olmayan tarayici
+  tasarim promptu F7 icinde yan tasarim isi olarak parcalara ayrildi.
+  Uygulama kurali: calismayan/sahte AI sohbet paneli gosterme; AI yuzeyleri
+  ancak gercek worker/backend baglaninca acilsin. Ilk dilim mevcut kirli
+  farklarin ustune ilerliyor: `Theme` paleti notr gri + yumusak maviye
+  cekildi, `tabx://newtab` kapsul merkezi arama, hafif dalga zemini ve sade
+  hizli erisim kartlarina tasindi; ek olarak layout'u daraltmayan overlay
+  `compact_nav_rail` eklendi. Rail yalnizca gercek eylemlere baglidir
+  (newtab, sag/sol panel, history, downloads, notes, gizlilik kalkanı,
+  screenshot, customize, settings). `PrivacyFloatingPanel` sag ustten kayan
+  gercek F3 durum panelidir: ad blocker/HTTPS toggle'lari mevcut metodlari
+  cagirir, engellenen sayisi `AdBlockInterceptor.blocked_count`'tan gelir,
+  site veri temizleme ayni onay akisina baglidir. Sonraki dilimler: toolbar
+  ikon ailesini teklestirme, secim varsa gorunen baglamsal arac cubugu, AI
+  panelini gercek F6+/worker baglantisiyla acma.
+- **F7 sade chrome/toolbar dilimi (2026-07-16):** Tarayici chrome'u prompttaki
+  daha ince ust yuzeye yaklastirildi: `TOOLBAR_HEIGHT` 60, `TAB_STRIP_HEIGHT`
+  46 oldu; `ui/tabs/tab_strip.py` sekme butonu 32px, strip 46px. Toolbar
+  margin/spacing ve adres cubugu 36px kapsul hale cekildi. `_shell_actions`,
+  sol panel ve `compact_nav_rail` ikonlari tek renkli, daha sade sembol
+  ailesine yaklastirildi (`≡`, `▤`, `↓`, `○`, `◇`, `□`, `•••`). Eski davranis
+  ayni kalir; yeni toolbar eylemleri yine `_shell_actions()` kaydindan
+  eklenmeli.
+- **F7 baglamsal alt arac cubugu (2026-07-16):** `ContextActionBar` eklendi.
+  Her yeni `BrowserTab.page().selectionChanged` sinyaline baglanir; aktif
+  sayfada secili metin varsa alt merkezde 430x46 glass pill olarak kayar.
+  Yalnizca gercek eylemler var: `Kopyala` Qt web action Copy, `Not al`
+  mevcut `clip_to_note`, `Çevir` secili metni Google Translate sekmesinde
+  acar, `Screenshot` mevcut `capture_screenshot`. AI gerektiren "Ozetle" veya
+  "Acikla" henuz eklenmedi; gercek AI worker/backend gelene kadar sahte
+  eylem gosterme. Sekme degisiminde bar kapatilir.
+- **F7 sol panel workspace/sekmeler dilimi (2026-07-16):** Sol panel artik
+  prompttaki genisletilmis workspace hissine yaklasti. `left_sections` icine
+  `workspace_tabs` anahtari eklendi; panelin ustunde "Calisma alanlari" chip
+  listesi ve "Acik sekmeler" listesi gorunur. Workspace satirlari mevcut
+  `switch_workspace`, `+` mevcut `add_workspace`; sekme satirlari
+  `tabs.setCurrentIndex` ile gercek sekmeye gecer. Liste sekme ekleme/kapatma,
+  baslik degisimi, sekme aktivasyonu ve workspace degisiminde yenilenir.
+  Ozellestirme merkezi "Paneller" kartinda bu bolum acilip kapatilabilir.
+- **F7 gecici GPT Yardimci paneli (2026-07-16):** Kullanici "simdilik AI
+  tarafi GPT olsun" kararini verdi. `features/ai/openai_client.py` eklendi;
+  stdlib `urllib` ile OpenAI Responses API'ye gider, key yalnizca
+  `OPENAI_API_KEY` ortam degiskeninden okunur, model `OPENAI_MODEL` ile
+  override edilebilir (varsayilan `gpt-5-mini`). `AssistantPanel` sagdan kayan
+  overlay'dir; toolbar/compact rail/sol panel/komut paletinden `A` Yardimci
+  olarak acilir. Sayfa baglami `document.body.innerText` ile 6500 karaktere
+  kadar alinip `GptRequestWorker(QThread)` uzerinden gonderilir. Key yoksa
+  panel acilir ama sahte cevap uretmez; acik kurulum mesaji verir. Local
+  Ollama hedefi iptal edilmedi, `docs/AGENT_WORKFLOW.md` icinde gecici bulut
+  modu olarak belgelendi.
+
 - **F7 ozellestirme merkezi teslim edildi — F7 FAZI KAPANDI (2026-07-14):**
   `tabx://customize` kullanici onayli tasarim taslagindan implemente edildi
   (kabuk haritasi solda sticky, editor kartlari sagda). Kritik desenler:

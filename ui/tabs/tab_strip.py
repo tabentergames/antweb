@@ -24,7 +24,7 @@ class TabButton(QFrame):
         self._icon = None
         self._island_start = island_start
 
-        self.setFixedHeight(34)
+        self.setFixedHeight(32)
         self.setMinimumWidth(self.MIN_WIDTH)
         self.setMaximumWidth(self.natural_max_width())
         self.setup_ui()
@@ -197,9 +197,9 @@ class TabWidget(QWidget):
 
         self.layout = QHBoxLayout(self)
         self.setObjectName("tabStrip")
-        self.layout.setContentsMargins(14, 8, 14, 8)
+        self.layout.setContentsMargins(14, 7, 14, 7)
         self.layout.setSpacing(6)
-        self.setFixedHeight(50)
+        self.setFixedHeight(46)
         self.apply_style()
 
     def apply_style(self):

@@ -6,6 +6,24 @@ Son guncelleme: 2026-07-13
 
 - `main.py` calisan PyQt6 uygulama girisidir.
 - `core/browser_window.py` icinde F1 tarayici cekirdegi ve F3 gizlilik baglantisi duruyor; F2 tema ve tab strip parcalari `ui/` altina ayrildi.
+- **F7 tasarim donusumu in-progress (2026-07-16):** Kullanici promptu dogrultusunda
+  yeni nesil sade/premium tarayici dili baslatildi. Mevcut durumda `Theme`
+  paleti notr gri + yumusak mavi vurguya cekiliyor, `tabx://newtab` merkezi
+  kapsul arama + sade hizli erisim + hafif dalga arka plana tasindi ve
+  sayfayi daraltmayan overlay compact sol rail eklendi. Rail yalnizca gercek
+  eylemlere baglidir. `PrivacyFloatingPanel` sag ustte acilan gercek gizlilik
+  kalkanidir; F3 ad blocker/HTTPS durumunu ve oturumluk engellenen istek
+  sayisini gosterir. Chrome yuzeyi de sadeleştirildi: toolbar 60px, tab strip
+  46px; adres cubugu daha kompakt kapsul, toolbar/rail/sol panel ikonlari daha
+  tek renkli bir sembol ailesine cekildi. `ContextActionBar` metin secilince
+  alt merkezde gorunur; kopyala, not al, Google Translate sekmesinde cevir ve
+  screenshot eylemlerini calistirir. Sol panelin ustunde artik
+  `workspace_tabs` bolumu var: calisma alanlari chip'leri ve acik sekmeler
+  listesi gercek workspace/sekme akislariyla baglidir ve ozellestirme
+  merkezinden kapatilabilir. Gecici GPT Yardimci paneli eklendi:
+  `features/ai/openai_client.py` OpenAI Responses API'yi `OPENAI_API_KEY`
+  varsa kullanir, model `OPENAI_MODEL` ile degisir; key yoksa panel sahte
+  cevap uretmez ve kurulum mesaji gosterir.
 - Mevcut yetenekler:
   - QtWebEngine tabanli web goruntuleme.
   - Yeni sekme, sekme kapatma ve aktif sekme gecisi.
